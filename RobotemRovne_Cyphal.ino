@@ -98,10 +98,13 @@ cyphal::Publisher<uavcan::primitive::scalar::Bit_1_0> input_2_pub;
 cyphal::Publisher<uavcan::primitive::scalar::Bit_1_0> input_3_pub;
 cyphal::Publisher<uavcan::primitive::scalar::Integer16_1_0> analog_input_0_pub;
 cyphal::Publisher<uavcan::primitive::scalar::Integer16_1_0> analog_input_1_pub;
+cyphal::Publisher<uavcan::primitive::scalar::Integer16_1_0> motor_0_pwm_pub;
+cyphal::Publisher<uavcan::primitive::scalar::Integer16_1_0> motor_1_pwm_pub;
 
 cyphal::Subscription led_subscription;
 
 cyphal::Subscription output_0_subscription, output_1_subscription;
+cyphal::Subscription em_stop_subscription;
 
 cyphal::ServiceServer execute_command_srv = node_hdl.create_service_server<ExecuteCommand::Request_1_1, ExecuteCommand::Response_1_1>(2*1000*1000UL, onExecuteCommand_1_1_Request_Received);
 
@@ -166,6 +169,9 @@ static CanardPortID port_id_output0              = std::numeric_limits<CanardPor
 static CanardPortID port_id_output1              = std::numeric_limits<CanardPortID>::max();
 static CanardPortID port_id_analog_input0        = std::numeric_limits<CanardPortID>::max();
 static CanardPortID port_id_analog_input1        = std::numeric_limits<CanardPortID>::max();
+static CanardPortID port_id_em_stop              = std::numeric_limits<CanardPortID>::max();
+static CanardPortID port_id_motor0_pwm           = std::numeric_limits<CanardPortID>::max();
+static CanardPortID port_id_motor1_pwm           = std::numeric_limits<CanardPortID>::max();
 
 static uint16_t update_period_ms_inputvoltage        =  3*1000;
 static uint16_t update_period_ms_internaltemperature = 10*1000;
@@ -206,6 +212,12 @@ const auto reg_rw_cyphal_sub_output0_id                     = node_registry->exp
 const auto reg_ro_cyphal_sub_output0_type                   = node_registry->route ("cyphal.sub.output0.type",                  {true}, []() { return "uavcan.primitive.scalar.Bit.1.0"; });
 const auto reg_rw_cyphal_sub_output1_id                     = node_registry->expose("cyphal.sub.output1.id",                    {true}, port_id_output1);
 const auto reg_ro_cyphal_sub_output1_type                   = node_registry->route ("cyphal.sub.output1.type",                  {true}, []() { return "uavcan.primitive.scalar.Bit.1.0"; });
+const auto reg_rw_cyphal_sub_em_stop_id                     = node_registry->expose("cyphal.sub.em_stop.id",                    {true}, port_id_em_stop);
+const auto reg_ro_cyphal_sub_em_stop_type                   = node_registry->route ("cyphal.sub.em_stop.type",                  {true}, []() { return "uavcan.primitive.scalar.Bit.1.0"; });
+const auto reg_rw_cyphal_pub_motor0_pwm_id                  = node_registry->expose("cyphal.pub.motor0pwm.id",                  {true}, port_id_motor0_pwm);
+const auto reg_ro_cyphal_pub_motor0_pwm_type                = node_registry->route ("cyphal.pub.motor0pwm.type",                {true}, []() { return "uavcan.primitive.scalar.Integer16.1.0"; });
+const auto reg_rw_cyphal_pub_motor1_pwm_id                  = node_registry->expose("cyphal.pub.motor1pwm.id",                  {true}, port_id_motor1_pwm);
+const auto reg_ro_cyphal_pub_motor1_pwm_type                = node_registry->route ("cyphal.pub.motor1pwm.type",                {true}, []() { return "uavcan.primitive.scalar.Integer16.1.0"; });
 const auto reg_rw_pico_update_period_ms_inputvoltage        = node_registry->expose("pico.update_period_ms.inputvoltage",        {true}, update_period_ms_inputvoltage);
 const auto reg_rw_pico_update_period_ms_internaltemperature = node_registry->expose("pico.update_period_ms.internaltemperature", {true}, update_period_ms_internaltemperature);
 const auto reg_rw_pico_update_period_ms_input0              = node_registry->expose("pico.update_period_ms.input0",              {true}, update_period_ms_input0);
@@ -318,6 +330,17 @@ void setup()
     analog_input_0_pub = node_hdl.create_publisher<uavcan::primitive::scalar::Integer16_1_0>(port_id_analog_input0, 1*1000*1000UL /* = 1 sec in usecs. */);
   if (port_id_analog_input1 != std::numeric_limits<CanardPortID>::max())
     analog_input_1_pub = node_hdl.create_publisher<uavcan::primitive::scalar::Integer16_1_0>(port_id_analog_input1, 1*1000*1000UL /* = 1 sec in usecs. */);
+  if (port_id_motor0_pwm != std::numeric_limits<CanardPortID>::max())
+    motor_0_pwm_pub = node_hdl.create_publisher<uavcan::primitive::scalar::Integer16_1_0>(port_id_motor0_pwm, 1*1000*1000UL /* = 1 sec in usecs. */);
+  if (port_id_motor1_pwm != std::numeric_limits<CanardPortID>::max())
+    motor_1_pwm_pub = node_hdl.create_publisher<uavcan::primitive::scalar::Integer16_1_0>(port_id_motor1_pwm, 1*1000*1000UL /* = 1 sec in usecs. */);
+  if (port_id_em_stop != std::numeric_limits<CanardPortID>::max())
+    em_stop_subscription = node_hdl.create_subscription<uavcan::primitive::scalar::Bit_1_0>(
+      port_id_em_stop,
+      [](uavcan::primitive::scalar::Bit_1_0 const & msg)
+      {
+      });
+
 
     /* set factory settings */
     if(update_period_ms_inputvoltage==0xFFFF)        update_period_ms_inputvoltage=3*1000;
@@ -398,9 +421,11 @@ void setup()
   CanardFilter const CAN_FILTER_OUT_0   = canardMakeFilterForSubject(port_id_output0);
   CanardFilter const CAN_FILTER_OUT_1   = canardMakeFilterForSubject(port_id_output1);
   CanardFilter const CAN_FILTER_LED     = canardMakeFilterForSubject(port_id_led1);
+  CanardFilter const CAN_FILTER_EM_STOP = canardMakeFilterForSubject(port_id_em_stop);
 
   CanardFilter consolidated_filter = canardConsolidateFilters(&CAN_FILTER_OUT_0, &CAN_FILTER_OUT_1);
                consolidated_filter = canardConsolidateFilters(&consolidated_filter, &CAN_FILTER_LED);
+               consolidated_filter = canardConsolidateFilters(&consolidated_filter, &CAN_FILTER_EM_STOP);
 
   DBG_INFO("CAN Filter #2\n\r\tExt. Mask : %8X\n\r\tExt. ID   : %8X",
            consolidated_filter.extended_mask,
