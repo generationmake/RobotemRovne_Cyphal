@@ -1,10 +1,10 @@
 /**
- * Default firmware for the CyphalPicoBase-CAN (https://github.com/generationmake/CyphalPicoBase-CAN)
+ * Firmware for the Controller for the Robotem Rovne Contest, based on the CyphalPicoBase-CAN (https://github.com/generationmake/CyphalPicoBase-CAN)
  *
  * This software is distributed under the terms of the MIT License.
- * Copyright (c) 2023 LXRobotics.
- * Author: Alexander Entinger <alexander.entinger@lxrobotics.com>
- * Contributors: https://github.com/107-systems/CyphalPicoBase-CAN-firmware/graphs/contributors.
+ * Copyright (c) 2025 generationmake.
+ * Author: Bernhard Mayer <bernhard@generationmake.de>
+ * Contributors: https://github.com/generationmake/RobotemRovne-Cyphal/graphs/contributors.
  */
 
 /**************************************************************************************
@@ -13,7 +13,6 @@
 
 #include <SPI.h>
 #include <Wire.h>
-#include <Servo.h>
 
 #include <107-Arduino-Cyphal.h>
 #include <107-Arduino-Cyphal-Support.h>
@@ -33,8 +32,6 @@
 #undef min
 #include <algorithm>
 
-#include "NeoPixelControl.h"
-
 /**************************************************************************************
  * NAMESPACE
  **************************************************************************************/
@@ -53,9 +50,6 @@ static int const INPUT_2_PIN        =  8;
 static int const INPUT_3_PIN        =  9;
 static int const OUTPUT_0_PIN       = 10;
 static int const OUTPUT_1_PIN       = 11;
-static int const NEOPIXEL_PIN       = 13; /* Raspberry Pi Pico */
-static int const SERVO_0_PIN        = 14;
-static int const SERVO_1_PIN        = 15;
 static int const MCP2515_CS_PIN     = 17;
 static int const MCP2515_INT_PIN    = 20;
 static int const LED_2_PIN          = 21; /* GP21 */
@@ -64,29 +58,11 @@ static int const ANALOG_PIN         = 26;
 static int const ANALOG_INPUT_0_PIN = 27;
 static int const ANALOG_INPUT_1_PIN = 28;
 
-static int const NEOPIXEL_NUM_PIXELS = 8; /* Popular NeoPixel ring size */
-
 static SPISettings const MCP2515x_SPI_SETTING{10*1000*1000UL, MSBFIRST, SPI_MODE0};
 
 static uint16_t const UPDATE_PERIOD_HEARTBEAT_ms = 1000;
 
 static uint32_t const WATCHDOG_DELAY_ms = 1000;
-
-static int8_t const LIGHT_MODE_RED         =   1;
-static int8_t const LIGHT_MODE_GREEN       =   2;
-static int8_t const LIGHT_MODE_BLUE        =   3;
-static int8_t const LIGHT_MODE_WHITE       =   4;
-static int8_t const LIGHT_MODE_AMBER       =   5;
-static int8_t const LIGHT_MODE_BLINK_RED   =  11;
-static int8_t const LIGHT_MODE_BLINK_GREEN =  12;
-static int8_t const LIGHT_MODE_BLINK_BLUE  =  13;
-static int8_t const LIGHT_MODE_BLINK_WHITE =  14;
-static int8_t const LIGHT_MODE_BLINK_AMBER =  15;
-static int8_t const LIGHT_MODE_RUN_RED     = 101;
-static int8_t const LIGHT_MODE_RUN_GREEN   = 102;
-static int8_t const LIGHT_MODE_RUN_BLUE    = 103;
-static int8_t const LIGHT_MODE_RUN_WHITE   = 104;
-static int8_t const LIGHT_MODE_RUN_AMBER   = 105;
 
 /**************************************************************************************
  * FUNCTION DECLARATION
@@ -125,17 +101,9 @@ cyphal::Publisher<uavcan::primitive::scalar::Integer16_1_0> analog_input_1_pub;
 
 cyphal::Subscription led_subscription;
 
-uavcan::primitive::scalar::Integer8_1_0 light_mode_msg{LIGHT_MODE_WHITE};
-cyphal::Subscription light_mode_subscription;
-
 cyphal::Subscription output_0_subscription, output_1_subscription;
 
-Servo servo_0, servo_1;
-cyphal::Subscription servo_0_subscription, servo_1_subscription;
-
 cyphal::ServiceServer execute_command_srv = node_hdl.create_service_server<ExecuteCommand::Request_1_1, ExecuteCommand::Response_1_1>(2*1000*1000UL, onExecuteCommand_1_1_Request_Received);
-
-NeoPixelControl neo_pixel_ctrl(NEOPIXEL_PIN, NEOPIXEL_NUM_PIXELS);
 
 /* LITTLEFS/EEPROM ********************************************************************/
 
@@ -196,11 +164,8 @@ static CanardPortID port_id_input2               = std::numeric_limits<CanardPor
 static CanardPortID port_id_input3               = std::numeric_limits<CanardPortID>::max();
 static CanardPortID port_id_output0              = std::numeric_limits<CanardPortID>::max();
 static CanardPortID port_id_output1              = std::numeric_limits<CanardPortID>::max();
-static CanardPortID port_id_servo0               = std::numeric_limits<CanardPortID>::max();
-static CanardPortID port_id_servo1               = std::numeric_limits<CanardPortID>::max();
 static CanardPortID port_id_analog_input0        = std::numeric_limits<CanardPortID>::max();
 static CanardPortID port_id_analog_input1        = std::numeric_limits<CanardPortID>::max();
-static CanardPortID port_id_light_mode           = std::numeric_limits<CanardPortID>::max();
 
 static uint16_t update_period_ms_inputvoltage        =  3*1000;
 static uint16_t update_period_ms_internaltemperature = 10*1000;
@@ -210,7 +175,6 @@ static uint16_t update_period_ms_input2              =     500;
 static uint16_t update_period_ms_input3              =     500;
 static uint16_t update_period_ms_analoginput0        =     500;
 static uint16_t update_period_ms_analoginput1        =     500;
-static uint16_t update_period_ms_light               =     250;
 
 static std::string node_description{"CyphalPicoBase/CAN"};
 
@@ -242,12 +206,6 @@ const auto reg_rw_cyphal_sub_output0_id                     = node_registry->exp
 const auto reg_ro_cyphal_sub_output0_type                   = node_registry->route ("cyphal.sub.output0.type",                  {true}, []() { return "uavcan.primitive.scalar.Bit.1.0"; });
 const auto reg_rw_cyphal_sub_output1_id                     = node_registry->expose("cyphal.sub.output1.id",                    {true}, port_id_output1);
 const auto reg_ro_cyphal_sub_output1_type                   = node_registry->route ("cyphal.sub.output1.type",                  {true}, []() { return "uavcan.primitive.scalar.Bit.1.0"; });
-const auto reg_rw_cyphal_sub_servo0_id                      = node_registry->expose("cyphal.sub.servo0.id",                     {true}, port_id_servo0);
-const auto reg_ro_cyphal_sub_servo0_type                    = node_registry->route ("cyphal.sub.servo0.type",                   {true}, []() { return "uavcan.primitive.scalar.Integer16.1.0"; });
-const auto reg_rw_cyphal_sub_servo1_id                      = node_registry->expose("cyphal.sub.servo1.id",                     {true}, port_id_servo1);
-const auto reg_ro_cyphal_sub_servo1_type                    = node_registry->route ("cyphal.sub.servo1.type",                   {true}, []() { return "uavcan.primitive.scalar.Integer16.1.0"; });
-const auto reg_rw_cyphal_sub_lightmode_id                   = node_registry->expose("cyphal.sub.lightmode.id",                  {true}, port_id_light_mode);
-const auto reg_ro_cyphal_sub_lightmode_type                 = node_registry->route ("cyphal.sub.lightmode.type",                {true}, []() { return "uavcan.primitive.scalar.Integer8.1.0"; });
 const auto reg_rw_pico_update_period_ms_inputvoltage        = node_registry->expose("pico.update_period_ms.inputvoltage",        {true}, update_period_ms_inputvoltage);
 const auto reg_rw_pico_update_period_ms_internaltemperature = node_registry->expose("pico.update_period_ms.internaltemperature", {true}, update_period_ms_internaltemperature);
 const auto reg_rw_pico_update_period_ms_input0              = node_registry->expose("pico.update_period_ms.input0",              {true}, update_period_ms_input0);
@@ -256,7 +214,6 @@ const auto reg_rw_pico_update_period_ms_input2              = node_registry->exp
 const auto reg_rw_pico_update_period_ms_input3              = node_registry->expose("pico.update_period_ms.input3",              {true}, update_period_ms_input3);
 const auto reg_rw_pico_update_period_ms_analoginput0        = node_registry->expose("pico.update_period_ms.analoginput0",        {true}, update_period_ms_analoginput0);
 const auto reg_rw_pico_update_period_ms_analoginput1        = node_registry->expose("pico.update_period_ms.analoginput1",        {true}, update_period_ms_analoginput1);
-const auto reg_rw_pico_update_period_ms_light               = node_registry->expose("pico.update_period_ms.light",               {true}, update_period_ms_light);
 
 #endif /* __GNUC__ >= 11 */
 
@@ -348,22 +305,6 @@ void setup()
           digitalWrite(OUTPUT_1_PIN, LOW);
       });
 
-  if (port_id_servo0 != std::numeric_limits<CanardPortID>::max())
-    servo_0_subscription = node_hdl.create_subscription<uavcan::primitive::scalar::Integer16_1_0>(
-      port_id_servo0,
-      [](uavcan::primitive::scalar::Integer16_1_0 const & msg) -> void
-      {
-        servo_0.writeMicroseconds(msg.value);
-      });
-
-  if (port_id_servo1 != std::numeric_limits<CanardPortID>::max())
-    servo_1_subscription = node_hdl.create_subscription<uavcan::primitive::scalar::Integer16_1_0>(
-      port_id_servo1,
-      [](uavcan::primitive::scalar::Integer16_1_0 const & msg) -> void
-      {
-        servo_1.writeMicroseconds(msg.value);
-      });
-
   if (port_id_input0 != std::numeric_limits<CanardPortID>::max())
     input_0_pub = node_hdl.create_publisher<uavcan::primitive::scalar::Bit_1_0>(port_id_input0, 1*1000*1000UL /* = 1 sec in usecs. */);
   if (port_id_input1 != std::numeric_limits<CanardPortID>::max())
@@ -378,14 +319,6 @@ void setup()
   if (port_id_analog_input1 != std::numeric_limits<CanardPortID>::max())
     analog_input_1_pub = node_hdl.create_publisher<uavcan::primitive::scalar::Integer16_1_0>(port_id_analog_input1, 1*1000*1000UL /* = 1 sec in usecs. */);
 
-  if (port_id_light_mode != std::numeric_limits<CanardPortID>::max())
-    light_mode_subscription = node_hdl.create_subscription<uavcan::primitive::scalar::Integer8_1_0>(
-      port_id_light_mode,
-      [](uavcan::primitive::scalar::Integer8_1_0 const & msg)
-      {
-        light_mode_msg = msg;
-      });
-
     /* set factory settings */
     if(update_period_ms_inputvoltage==0xFFFF)        update_period_ms_inputvoltage=3*1000;
     if(update_period_ms_internaltemperature==0xFFFF) update_period_ms_internaltemperature=10*1000;
@@ -395,7 +328,6 @@ void setup()
     if(update_period_ms_input3==0xFFFF)              update_period_ms_input3=500;
     if(update_period_ms_analoginput0==0xFFFF)        update_period_ms_analoginput0=500;
     if(update_period_ms_analoginput1==0xFFFF)        update_period_ms_analoginput1=500;
-    if(update_period_ms_light==0xFFFF)               update_period_ms_light=250;
 
   /* NODE INFO **************************************************************************/
   static const auto node_info = node_hdl.create_node_info
@@ -415,7 +347,7 @@ void setup()
     /* saturated uint8[16] unique_id */
     cyphal::support::UniqueId::instance().value(),
     /* saturated uint8[<=50] name */
-    "107-systems.CyphalPicoBase/CAN"
+    "generationmake.RobotemRovne"
   );
 
   /* Setup LED pins and initialize */
@@ -435,14 +367,6 @@ void setup()
   pinMode(OUTPUT_1_PIN, OUTPUT);
   digitalWrite(OUTPUT_0_PIN, LOW);
   digitalWrite(OUTPUT_1_PIN, LOW);
-
-  /* Setup SERVO0/SERVO1. */
-  servo_0.attach(SERVO_0_PIN, 800, 2200);
-  servo_1.attach(SERVO_1_PIN, 800, 2200);
-  servo_0.writeMicroseconds(1500);
-  servo_1.writeMicroseconds(1500);
-
-  neo_pixel_ctrl.begin();
 
   /* Setup SPI access */
   SPI.begin();
@@ -473,15 +397,9 @@ void setup()
   /* Only pass messages with subscribed port IDs. */
   CanardFilter const CAN_FILTER_OUT_0   = canardMakeFilterForSubject(port_id_output0);
   CanardFilter const CAN_FILTER_OUT_1   = canardMakeFilterForSubject(port_id_output1);
-  CanardFilter const CAN_FILTER_SERVO_0 = canardMakeFilterForSubject(port_id_servo0);
-  CanardFilter const CAN_FILTER_SERVO_1 = canardMakeFilterForSubject(port_id_servo1);
-  CanardFilter const CAN_FILTER_LIGHT   = canardMakeFilterForSubject(port_id_light_mode);
   CanardFilter const CAN_FILTER_LED     = canardMakeFilterForSubject(port_id_led1);
 
   CanardFilter consolidated_filter = canardConsolidateFilters(&CAN_FILTER_OUT_0, &CAN_FILTER_OUT_1);
-               consolidated_filter = canardConsolidateFilters(&consolidated_filter, &CAN_FILTER_SERVO_0);
-               consolidated_filter = canardConsolidateFilters(&consolidated_filter, &CAN_FILTER_SERVO_1);
-               consolidated_filter = canardConsolidateFilters(&consolidated_filter, &CAN_FILTER_LIGHT);
                consolidated_filter = canardConsolidateFilters(&consolidated_filter, &CAN_FILTER_LED);
 
   DBG_INFO("CAN Filter #2\n\r\tExt. Mask : %8X\n\r\tExt. ID   : %8X",
@@ -501,21 +419,6 @@ void setup()
 
   /* Leave configuration and enable MCP2515. */
   mcp2515.setNormalMode();
-
-  /* Configure initial heartbeat */
-  light_mode_msg.value = LIGHT_MODE_RUN_BLUE;
-
-  neo_pixel_ctrl.light_red();
-  delay(100);
-  neo_pixel_ctrl.light_amber();
-  delay(100);
-  neo_pixel_ctrl.light_green();
-  delay(100);
-  neo_pixel_ctrl.light_blue();
-  delay(100);
-  neo_pixel_ctrl.light_white();
-  delay(100);
-  neo_pixel_ctrl.light_off();
 
   /* Enable watchdog. */
   rp2040.wdt_begin(WATCHDOG_DELAY_ms);
@@ -551,92 +454,6 @@ void loop()
   static unsigned long prev_analog_input1 = 0;
 
   unsigned long const now = millis();
-
-  /* light mode for neopixels */
-  if((now - prev_led) > update_period_ms_light)
-  {
-    static bool is_light_on = false;
-    is_light_on = !is_light_on;
-    static int running_light_counter = 0;
-    running_light_counter ++;
-    if(running_light_counter>=8) running_light_counter=0;
-
-    if      (light_mode_msg.value == LIGHT_MODE_RED)
-      neo_pixel_ctrl.light_red();
-    else if (light_mode_msg.value == LIGHT_MODE_GREEN)
-      neo_pixel_ctrl.light_green();
-    else if (light_mode_msg.value == LIGHT_MODE_BLUE)
-      neo_pixel_ctrl.light_blue();
-    else if (light_mode_msg.value == LIGHT_MODE_WHITE)
-      neo_pixel_ctrl.light_white();
-    else if (light_mode_msg.value == LIGHT_MODE_AMBER)
-      neo_pixel_ctrl.light_amber();
-    else if (light_mode_msg.value == LIGHT_MODE_RUN_RED||light_mode_msg.value == LIGHT_MODE_RUN_GREEN||light_mode_msg.value == LIGHT_MODE_RUN_BLUE||light_mode_msg.value == LIGHT_MODE_RUN_WHITE||light_mode_msg.value == LIGHT_MODE_RUN_AMBER)
-    {
-      if (light_mode_msg.value == LIGHT_MODE_RUN_RED)
-      {
-        neo_pixel_ctrl.pixels().setPixelColor(running_light_counter,       neo_pixel_ctrl.pixels().Color(55, 0, 0));
-        neo_pixel_ctrl.pixels().setPixelColor((running_light_counter+7)%8, neo_pixel_ctrl.pixels().Color(27, 0, 0));
-        neo_pixel_ctrl.pixels().setPixelColor((running_light_counter+6)%8, neo_pixel_ctrl.pixels().Color(14, 0, 0));
-        neo_pixel_ctrl.pixels().setPixelColor((running_light_counter+5)%8, neo_pixel_ctrl.pixels().Color(7, 0, 0));
-        neo_pixel_ctrl.pixels().setPixelColor((running_light_counter+4)%8, neo_pixel_ctrl.pixels().Color(0, 0, 0));
-        neo_pixel_ctrl.pixels().show();
-      }
-      else if (light_mode_msg.value == LIGHT_MODE_RUN_GREEN)
-      {
-        neo_pixel_ctrl.pixels().setPixelColor(running_light_counter,       neo_pixel_ctrl.pixels().Color(0, 55, 0));
-        neo_pixel_ctrl.pixels().setPixelColor((running_light_counter+7)%8, neo_pixel_ctrl.pixels().Color(0, 27, 0));
-        neo_pixel_ctrl.pixels().setPixelColor((running_light_counter+6)%8, neo_pixel_ctrl.pixels().Color(0, 14, 0));
-        neo_pixel_ctrl.pixels().setPixelColor((running_light_counter+5)%8, neo_pixel_ctrl.pixels().Color(0, 7, 0));
-        neo_pixel_ctrl.pixels().setPixelColor((running_light_counter+4)%8, neo_pixel_ctrl.pixels().Color(0, 0, 0));
-        neo_pixel_ctrl.pixels().show();
-      }
-      else if (light_mode_msg.value == LIGHT_MODE_RUN_BLUE)
-      {
-        neo_pixel_ctrl.pixels().setPixelColor(running_light_counter,       neo_pixel_ctrl.pixels().Color(0, 0, 55));
-        neo_pixel_ctrl.pixels().setPixelColor((running_light_counter+7)%8, neo_pixel_ctrl.pixels().Color(0, 0, 27));
-        neo_pixel_ctrl.pixels().setPixelColor((running_light_counter+6)%8, neo_pixel_ctrl.pixels().Color(0, 0, 14));
-        neo_pixel_ctrl.pixels().setPixelColor((running_light_counter+5)%8, neo_pixel_ctrl.pixels().Color(0, 0, 7));
-        neo_pixel_ctrl.pixels().setPixelColor((running_light_counter+4)%8, neo_pixel_ctrl.pixels().Color(0, 0, 0));
-        neo_pixel_ctrl.pixels().show();
-      }
-      else if (light_mode_msg.value == LIGHT_MODE_RUN_WHITE)
-      {
-        neo_pixel_ctrl.pixels().setPixelColor(running_light_counter,       neo_pixel_ctrl.pixels().Color(55, 55, 55));
-        neo_pixel_ctrl.pixels().setPixelColor((running_light_counter+7)%8, neo_pixel_ctrl.pixels().Color(27, 27, 27));
-        neo_pixel_ctrl.pixels().setPixelColor((running_light_counter+6)%8, neo_pixel_ctrl.pixels().Color(14, 14, 14));
-        neo_pixel_ctrl.pixels().setPixelColor((running_light_counter+5)%8, neo_pixel_ctrl.pixels().Color(7, 7, 7));
-        neo_pixel_ctrl.pixels().setPixelColor((running_light_counter+4)%8, neo_pixel_ctrl.pixels().Color(0, 0, 0));
-        neo_pixel_ctrl.pixels().show();
-      }
-      else if (light_mode_msg.value == LIGHT_MODE_RUN_AMBER)
-      {
-        neo_pixel_ctrl.pixels().setPixelColor(running_light_counter,       neo_pixel_ctrl.pixels().Color(55, 40, 0));
-        neo_pixel_ctrl.pixels().setPixelColor((running_light_counter+7)%8, neo_pixel_ctrl.pixels().Color(27, 20, 0));
-        neo_pixel_ctrl.pixels().setPixelColor((running_light_counter+6)%8, neo_pixel_ctrl.pixels().Color(14, 10, 0));
-        neo_pixel_ctrl.pixels().setPixelColor((running_light_counter+5)%8, neo_pixel_ctrl.pixels().Color(7, 5, 0));
-        neo_pixel_ctrl.pixels().setPixelColor((running_light_counter+4)%8, neo_pixel_ctrl.pixels().Color(0, 0, 0));
-        neo_pixel_ctrl.pixels().show();
-      }
-    }
-    else if (is_light_on&&(light_mode_msg.value == LIGHT_MODE_BLINK_RED||light_mode_msg.value == LIGHT_MODE_BLINK_GREEN||light_mode_msg.value == LIGHT_MODE_BLINK_BLUE||light_mode_msg.value == LIGHT_MODE_BLINK_WHITE||light_mode_msg.value == LIGHT_MODE_BLINK_AMBER))
-    {
-      if (light_mode_msg.value == LIGHT_MODE_BLINK_GREEN)
-        neo_pixel_ctrl.light_green();
-      else if (light_mode_msg.value == LIGHT_MODE_BLINK_BLUE)
-        neo_pixel_ctrl.light_blue();
-      else if (light_mode_msg.value == LIGHT_MODE_BLINK_WHITE)
-        neo_pixel_ctrl.light_white();
-      else if (light_mode_msg.value == LIGHT_MODE_BLINK_AMBER)
-        neo_pixel_ctrl.light_amber();
-      else
-        neo_pixel_ctrl.light_red();
-    }
-    else
-      neo_pixel_ctrl.light_off();
-
-    prev_led = now;
-  }
 
   /* Publish the heartbeat once/second */
   if((now - prev_heartbeat) > UPDATE_PERIOD_HEARTBEAT_ms)
@@ -792,7 +609,6 @@ ExecuteCommand::Response_1_1 onExecuteCommand_1_1_Request_Received(ExecuteComman
 
     digitalWrite(LED_2_PIN, HIGH);
     digitalWrite(LED_3_PIN, HIGH);
-    neo_pixel_ctrl.light_off();
   }
   else if (req.command == ExecuteCommand::Request_1_1::COMMAND_BEGIN_SOFTWARE_UPDATE)
   {
