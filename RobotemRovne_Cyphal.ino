@@ -11,6 +11,8 @@
  * INCLUDE
  **************************************************************************************/
 
+#include <Adafruit_GFX.h>    // Core graphics library
+#include <Adafruit_ST7735.h> // Hardware-specific library for ST7735
 #include <SPI.h>
 #include <Wire.h>
 
@@ -51,6 +53,9 @@ static int const LED_3_PIN          = 22; /* GP22 */
 static int const ANALOG_PIN         = 26;
 static int const ANALOG_INPUT_0_PIN = 27;
 static int const ANALOG_INPUT_1_PIN = 28;
+  #define TFT_CS         6
+  #define TFT_RST        9 // Or set to -1 and connect to Arduino RESET pin
+  #define TFT_DC         7
 
 static SPISettings const MCP2515x_SPI_SETTING{10*1000*1000UL, MSBFIRST, SPI_MODE0};
 
@@ -68,6 +73,8 @@ ExecuteCommand::Response_1_1 onExecuteCommand_1_1_Request_Received(ExecuteComman
 /**************************************************************************************
  * GLOBAL VARIABLES
  **************************************************************************************/
+
+Adafruit_ST7735 tft = Adafruit_ST7735(&SPI1, TFT_CS, TFT_DC, TFT_RST);
 
 DEBUG_INSTANCE(80, Serial);
 
@@ -201,6 +208,9 @@ void setup()
   Serial.begin(115200);
   // while(!Serial) { } /* only for debug */
   delay(1000);
+
+  SPI1.setTX(11);
+  SPI1.setSCK(10);
 
   Debug.prettyPrintOn(); /* Enable pretty printing on a shell. */
 
@@ -373,6 +383,14 @@ void setup()
 
   /* Leave configuration and enable MCP2515. */
   mcp2515.setNormalMode();
+
+  // Use this initializer if using a 1.8" TFT screen:
+  tft.initR(INITR_BLACKTAB);      // Init ST7735S chip, black tab
+  tft.fillScreen(ST77XX_BLACK);
+  tft.setCursor(0, 30);
+  tft.setTextColor(ST77XX_GREEN);
+  tft.setTextSize(3);
+  tft.println("Robotem Rovne");
 
   /* Enable watchdog. */
   rp2040.wdt_begin(WATCHDOG_DELAY_ms);
