@@ -104,6 +104,8 @@ cyphal::Subscription em_stop_subscription;
 
 cyphal::ServiceServer execute_command_srv = node_hdl.create_service_server<ExecuteCommand::Request_1_1, ExecuteCommand::Response_1_1>(2*1000*1000UL, onExecuteCommand_1_1_Request_Received);
 
+bool status_em_stop = 0;
+
 /* LITTLEFS/EEPROM ********************************************************************/
 
 static EEPROM_24LCxx eeprom(EEPROM_24LCxx_Type::LC64,
@@ -281,6 +283,7 @@ void setup()
       port_id_em_stop,
       [](uavcan::primitive::scalar::Bit_1_0 const & msg)
       {
+        status_em_stop = msg.value;
       });
 
 
@@ -420,6 +423,7 @@ void loop()
   static unsigned long prev_internal_temperature = 0;
   static unsigned long prev_analog_input0 = 0;
   static unsigned long prev_analog_input1 = 0;
+  static unsigned long prev_display = 0;
 
   unsigned long const now = millis();
 
@@ -479,6 +483,23 @@ void loop()
     if(analog_input_1_pub) analog_input_1_pub->publish(uavcan_analog_input1);
 
     prev_analog_input1 = now;
+  }
+
+  /* update display function - every 200 ms */
+  if((now - prev_display) > 200)
+  {
+    tft.fillRect(0,0,20,8,ST77XX_BLACK);
+    tft.setTextColor(ST77XX_WHITE);
+    tft.setTextSize(0);
+    tft.setCursor(0, 0);
+    tft.print(millis() / 1000);
+
+    tft.setCursor(0, 140);
+    if(status_em_stop==0) tft.setTextColor(ST77XX_RED);
+    else tft.setTextColor(ST77XX_GREEN);
+    tft.print("STOP");
+
+    prev_display = now;
   }
 
   /* Feed the watchdog only if not an async reset is
