@@ -15,6 +15,7 @@
 #include <Adafruit_ST7735.h> // Hardware-specific library for ST7735
 #include <SPI.h>
 #include <Wire.h>
+#include <Adafruit_BNO055.h>
 
 #include <107-Arduino-Cyphal.h>
 #include <107-Arduino-Cyphal-Support.h>
@@ -75,6 +76,7 @@ ExecuteCommand::Response_1_1 onExecuteCommand_1_1_Request_Received(ExecuteComman
  **************************************************************************************/
 
 Adafruit_ST7735 tft = Adafruit_ST7735(&SPI1, TFT_CS, TFT_DC, TFT_RST);
+Adafruit_BNO055 bno = Adafruit_BNO055(55, 0x28);
 
 DEBUG_INSTANCE(80, Serial);
 
@@ -395,6 +397,16 @@ void setup()
   tft.setTextSize(3);
   tft.println("Robotem Rovne");
 
+  if (!bno.begin())
+  {
+    DBG_ERROR("No BNO055 detected");
+    tft.setCursor(0, 90);
+    tft.setTextColor(ST77XX_RED);
+    tft.setTextSize(2);
+    tft.println("no BNO055!");
+    while (1);
+  }
+
   /* Enable watchdog. */
   rp2040.wdt_begin(WATCHDOG_DELAY_ms);
   rp2040.wdt_reset();
@@ -423,7 +435,10 @@ void loop()
   static unsigned long prev_internal_temperature = 0;
   static unsigned long prev_analog_input0 = 0;
   static unsigned long prev_analog_input1 = 0;
+  static unsigned long prev_sensor = 0;
   static unsigned long prev_display = 0;
+
+  static sensors_event_t orientationData , linearAccelData;
 
   unsigned long const now = millis();
 
@@ -485,6 +500,14 @@ void loop()
     prev_analog_input1 = now;
   }
 
+  /* update sensor function - every 100 ms */
+  if((now - prev_sensor) > 100)
+  {
+    bno.getEvent(&orientationData, Adafruit_BNO055::VECTOR_EULER);
+
+    prev_sensor = now;
+  }
+
   /* update display function - every 200 ms */
   if((now - prev_display) > 200)
   {
@@ -498,6 +521,28 @@ void loop()
     if(status_em_stop==0) tft.setTextColor(ST77XX_RED);
     else tft.setTextColor(ST77XX_GREEN);
     tft.print("STOP");
+
+    tft.fillRect(10,90,80,16,ST77XX_BLACK);
+    tft.setTextColor(ST77XX_WHITE);
+    tft.setTextSize(2);
+    tft.setCursor(10, 90);
+    tft.print(orientationData.orientation.x);
+
+    tft.fillRect(0,150,100,8,ST77XX_BLACK);
+    tft.setTextColor(ST77XX_WHITE);
+    tft.setTextSize(0);
+    uint8_t system, gyro, accel, mag;
+    system = gyro = accel = mag = 0;
+    bno.getCalibration(&system, &gyro, &accel, &mag);
+
+    tft.setCursor(0, 150);
+    tft.print(system);
+    tft.setCursor(20, 150);
+    tft.print(gyro);
+    tft.setCursor(40, 150);
+    tft.print(accel);
+    tft.setCursor(60, 150);
+    tft.print(mag);
 
     prev_display = now;
   }
