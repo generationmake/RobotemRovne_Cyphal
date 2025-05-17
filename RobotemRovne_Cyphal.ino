@@ -172,7 +172,7 @@ static uint16_t update_period_ms_internaltemperature = 10*1000;
 static uint16_t update_period_ms_analoginput0        =     500;
 static uint16_t update_period_ms_analoginput1        =     500;
 
-static std::string node_description{"CyphalPicoBase/CAN"};
+static std::string node_description{"RobotemRovne2025"};
 
 #if __GNUC__ >= 11
 
@@ -404,12 +404,12 @@ void setup()
     tft.setTextColor(ST77XX_RED);
     tft.setTextSize(2);
     tft.println("no BNO055!");
-    while (1);
+//    while (1);
   }
 
   /* Enable watchdog. */
-  rp2040.wdt_begin(WATCHDOG_DELAY_ms);
-  rp2040.wdt_reset();
+//  rp2040.wdt_begin(WATCHDOG_DELAY_ms);
+//  rp2040.wdt_reset();
 
   DBG_INFO("Init complete.");
 }
