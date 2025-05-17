@@ -438,6 +438,10 @@ void loop()
   static unsigned long prev_sensor = 0;
   static unsigned long prev_display = 0;
 
+  static float heading_soll=0;
+  float heading_offset=0;
+
+  static int pwm=0;
   static sensors_event_t orientationData , linearAccelData;
 
   unsigned long const now = millis();
@@ -501,9 +505,49 @@ void loop()
   }
 
   /* update sensor function - every 100 ms */
-  if((now - prev_sensor) > 100)
+  if((now - prev_sensor) > 200)
   {
+    static int bno_count=0;
     bno.getEvent(&orientationData, Adafruit_BNO055::VECTOR_EULER);
+
+    if(status_em_stop==0)
+    {
+      bno_count=0;
+    }
+    else
+    {
+      if(bno_count<10)
+      {
+        heading_soll+=orientationData.orientation.x;
+        bno_count++;
+      }
+      else if(bno_count==10)
+      {
+        heading_soll/=10;
+        bno_count++;
+      }
+      else
+      {
+        uavcan::primitive::scalar::Integer16_1_0 uavcan_motor_0_pwm;
+        uavcan::primitive::scalar::Integer16_1_0 uavcan_motor_1_pwm;
+        if(pwm<150) 
+        {
+          pwm+=5;
+          uavcan_motor_0_pwm.value = pwm;
+          uavcan_motor_1_pwm.value = pwm;
+        }
+        else
+        {
+          heading_offset=heading_soll-orientationData.orientation.x;
+          if(heading_offset<-360.0) heading_offset+=360.0;
+          if(heading_offset>360.0) heading_offset-=360.0;
+          uavcan_motor_0_pwm.value = 152-heading_offset*2.0;
+          uavcan_motor_1_pwm.value = 150+heading_offset*2.0;
+        }
+        if(motor_0_pwm_pub) motor_0_pwm_pub->publish(uavcan_motor_0_pwm);
+        if(motor_1_pwm_pub) motor_1_pwm_pub->publish(uavcan_motor_1_pwm);
+      }
+    }
 
     prev_sensor = now;
   }
@@ -522,11 +566,13 @@ void loop()
     else tft.setTextColor(ST77XX_GREEN);
     tft.print("STOP");
 
-    tft.fillRect(10,90,80,16,ST77XX_BLACK);
+    tft.fillRect(10,90,80,32,ST77XX_BLACK);
     tft.setTextColor(ST77XX_WHITE);
     tft.setTextSize(2);
     tft.setCursor(10, 90);
     tft.print(orientationData.orientation.x);
+    tft.setCursor(10, 106);
+    tft.print(heading_soll);
 
     tft.fillRect(0,150,100,8,ST77XX_BLACK);
     tft.setTextColor(ST77XX_WHITE);
