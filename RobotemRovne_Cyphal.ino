@@ -439,7 +439,7 @@ void loop()
   static unsigned long prev_display = 0;
 
   static float heading_soll=0;
-  float heading_offset=0;
+  static float heading_offset=0;
 
   static int pwm=0;
   static sensors_event_t orientationData , linearAccelData;
@@ -573,7 +573,7 @@ void loop()
     tft.setCursor(10, 90);
     tft.print(orientationData.orientation.x);
     tft.setCursor(10, 106);
-    tft.print(heading_soll);
+    if(status_em_stop==1) tft.print(heading_soll);
 
     tft.fillRect(0,150,100,8,ST77XX_BLACK);
     tft.setTextColor(ST77XX_WHITE);
@@ -590,6 +590,19 @@ void loop()
     tft.print(accel);
     tft.setCursor(60, 150);
     tft.print(mag);
+
+    /* print circle and arrow */
+    if(status_em_stop==1)
+    {
+      int circle_x=64;
+      int circle_y=40;
+      int circle_r=30;
+
+      tft.fillCircle(circle_x, circle_y, circle_r, ST77XX_BLACK);
+      tft.drawCircle(circle_x, circle_y, circle_r, ST77XX_WHITE);
+      float circle_heading=heading_offset*1.0;
+      tft.fillTriangle((circle_x+circle_r*sin(circle_heading*DEG_TO_RAD)), (circle_y-circle_r*cos(circle_heading*DEG_TO_RAD)), (circle_x+circle_r*sin((circle_heading+150.0)*DEG_TO_RAD)), (circle_y-circle_r*cos((circle_heading+150.0)*DEG_TO_RAD)), (circle_x+circle_r*sin((circle_heading-150.0)*DEG_TO_RAD)), (circle_y-circle_r*cos((circle_heading-150.0)*DEG_TO_RAD)), ST77XX_BLUE);
+    }
 
     prev_display = now;
   }
