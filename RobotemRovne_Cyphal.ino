@@ -530,7 +530,7 @@ void loop()
       {
         uavcan::primitive::scalar::Integer16_1_0 uavcan_motor_0_pwm;
         uavcan::primitive::scalar::Integer16_1_0 uavcan_motor_1_pwm;
-        if(pwm<150) 
+        if(pwm<150)
         {
           pwm+=5;
           uavcan_motor_0_pwm.value = pwm;
