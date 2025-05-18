@@ -513,6 +513,7 @@ void loop()
     if(status_em_stop==0)
     {
       bno_count=0;
+      heading_soll=0;
     }
     else
     {
