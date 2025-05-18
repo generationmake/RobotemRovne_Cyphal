@@ -505,7 +505,7 @@ void loop()
   }
 
   /* update sensor function - every 100 ms */
-  if((now - prev_sensor) > 200)
+  if((now - prev_sensor) > 100)
   {
     static int bno_count=0;
     bno.getEvent(&orientationData, Adafruit_BNO055::VECTOR_EULER);
