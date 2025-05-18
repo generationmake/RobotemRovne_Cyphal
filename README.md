@@ -1,4 +1,6 @@
-# RobotemRovne_Cyphal
+<a href="https://opencyphal.org/"><img align="right" src="https://raw.githubusercontent.com/107-systems/.github/main/logo/opencyphal.svg" width="25%"></a>
+RobotemRovne_Cyphal
+==================
 Code for the Robot for the Robotem Rovne Contest based on the Cyphal protocol
 
 # Cyphal Settings
