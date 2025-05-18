@@ -19,4 +19,3 @@ Code for the Robot for the Robotem Rovne Contest based on the Cyphal protocol
 | Emergency Stop            | 100            |
 | Motor 0 PWM               | 200            |
 | Motor 1 PWM               | 201            |
-
