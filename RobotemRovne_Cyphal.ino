@@ -22,6 +22,7 @@
 #include <107-Arduino-MCP2515.h>
 #include <107-Arduino-littlefs.h>
 #include <107-Arduino-24LCxx.hpp>
+#include <NavPoint.h>
 
 #define DBG_ENABLE_ERROR
 #define DBG_ENABLE_WARNING
@@ -110,6 +111,10 @@ bool status_em_stop = 0;
 float imu_orientation_x = 0.0;
 uint8_t imu_calibration[] = { 0, 0, 0, 0 };
 float imu_coordinates[] = { 0.0, 0.0, 0.0 };
+float heading_soll=0;
+float heading_distance=0;
+//NavPoint dest(48.63326821391752, 13.026402339488873);
+NavPoint dest(48.63337634289529, 13.02637819960948);
 
 /* LITTLEFS/EEPROM ********************************************************************/
 
@@ -335,6 +340,11 @@ void setup()
           }
 
           imu_coordinates[sid] = msg.value[sid];
+          NavPoint pos(imu_coordinates[0], imu_coordinates[1]);
+          // distance
+          heading_distance = pos.calculateDistance(dest);
+          // heading
+          heading_soll = pos.calculateBearing(dest);
         }
       });
 
@@ -480,7 +490,7 @@ void loop()
   static unsigned long prev_sensor = 0;
   static unsigned long prev_display = 0;
 
-  static float heading_soll=0;
+//  static float heading_soll=0;
   static float heading_offset=0;
 
   static int pwm=0;
@@ -550,21 +560,25 @@ void loop()
   {
     static int bno_count=0;
 
+    heading_offset=heading_soll-imu_orientation_x;
+    if(heading_offset<-360.0) heading_offset+=360.0;
+    if(heading_offset>360.0) heading_offset-=360.0;
+
     if(status_em_stop==0)
     {
       bno_count=0;
-      heading_soll=0;
+//      heading_soll=0;
     }
     else
     {
       if(bno_count<10)
       {
-        heading_soll+=imu_orientation_x;
+//        heading_soll+=imu_orientation_x;
         bno_count++;
       }
       else if(bno_count==10)
       {
-        heading_soll/=10;
+//        heading_soll/=10;
         bno_count++;
       }
       else
@@ -579,9 +593,6 @@ void loop()
         }
         else
         {
-          heading_offset=heading_soll-imu_orientation_x;
-          if(heading_offset<-360.0) heading_offset+=360.0;
-          if(heading_offset>360.0) heading_offset-=360.0;
           uavcan_motor_0_pwm.value = 152-heading_offset*2.0;
           uavcan_motor_1_pwm.value = 150+heading_offset*2.0;
         }
@@ -611,10 +622,14 @@ void loop()
 //    tft.fillRect(0,90,128,77,ST77XX_BLACK);
     tft.setTextColor(ST77XX_WHITE);
     tft.setTextSize(2);
-    tft.setCursor(10, 90);
+    tft.setCursor(0, 80);
     tft.print(imu_orientation_x);
-    tft.setCursor(10, 106);
-    if(status_em_stop==1) tft.print(heading_soll);
+    if(status_em_stop==1) tft.setTextColor(ST77XX_WHITE);
+    else tft.setTextColor(0x4208);
+    tft.setCursor(0, 96);
+    tft.print(heading_soll);
+    tft.setCursor(0, 112);
+    tft.print(heading_distance);
 
 //    tft.fillRect(0,150,100,8,ST77XX_BLACK);
     tft.setTextColor(ST77XX_WHITE);
@@ -636,7 +651,7 @@ void loop()
     tft.print(imu_coordinates[2]);
 
     /* print circle and arrow */
-    if(status_em_stop==1)
+//    if(status_em_stop==1)
     {
       int circle_x=64;
       int circle_y=40;
