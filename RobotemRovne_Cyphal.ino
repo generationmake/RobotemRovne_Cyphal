@@ -15,7 +15,6 @@
 #include <Adafruit_ST7735.h> // Hardware-specific library for ST7735
 #include <SPI.h>
 #include <Wire.h>
-#include <Adafruit_BNO055.h>
 
 #include <107-Arduino-Cyphal.h>
 #include <107-Arduino-Cyphal-Support.h>
@@ -76,7 +75,6 @@ ExecuteCommand::Response_1_1 onExecuteCommand_1_1_Request_Received(ExecuteComman
  **************************************************************************************/
 
 Adafruit_ST7735 tft = Adafruit_ST7735(&SPI1, TFT_CS, TFT_DC, TFT_RST);
-Adafruit_BNO055 bno = Adafruit_BNO055(55, 0x28);
 
 DEBUG_INSTANCE(80, Serial);
 
@@ -101,12 +99,15 @@ cyphal::Publisher<uavcan::primitive::scalar::Integer16_1_0> motor_0_pwm_pub;
 cyphal::Publisher<uavcan::primitive::scalar::Integer16_1_0> motor_1_pwm_pub;
 
 cyphal::Subscription led_subscription;
-
 cyphal::Subscription em_stop_subscription;
+cyphal::Subscription imu_orientation_x_subscription;
+cyphal::Subscription imu_calibration_subscription;
 
 cyphal::ServiceServer execute_command_srv = node_hdl.create_service_server<ExecuteCommand::Request_1_1, ExecuteCommand::Response_1_1>(2*1000*1000UL, onExecuteCommand_1_1_Request_Received);
 
 bool status_em_stop = 0;
+float imu_orientation_x = 0.0;
+uint8_t imu_calibration[] = { 0, 0, 0, 0};
 
 /* LITTLEFS/EEPROM ********************************************************************/
 
@@ -166,6 +167,8 @@ static CanardPortID port_id_analog_input1        = std::numeric_limits<CanardPor
 static CanardPortID port_id_em_stop              = std::numeric_limits<CanardPortID>::max();
 static CanardPortID port_id_motor0_pwm           = std::numeric_limits<CanardPortID>::max();
 static CanardPortID port_id_motor1_pwm           = std::numeric_limits<CanardPortID>::max();
+static CanardPortID port_id_orientation_x        = std::numeric_limits<CanardPortID>::max();
+static CanardPortID port_id_calibration          = std::numeric_limits<CanardPortID>::max();
 
 static uint16_t update_period_ms_inputvoltage        =  3*1000;
 static uint16_t update_period_ms_internaltemperature = 10*1000;
@@ -196,6 +199,10 @@ const auto reg_rw_cyphal_pub_motor0_pwm_id                  = node_registry->exp
 const auto reg_ro_cyphal_pub_motor0_pwm_type                = node_registry->route ("cyphal.pub.motor0pwm.type",                {true}, []() { return "uavcan.primitive.scalar.Integer16.1.0"; });
 const auto reg_rw_cyphal_pub_motor1_pwm_id                  = node_registry->expose("cyphal.pub.motor1pwm.id",                  {true}, port_id_motor1_pwm);
 const auto reg_ro_cyphal_pub_motor1_pwm_type                = node_registry->route ("cyphal.pub.motor1pwm.type",                {true}, []() { return "uavcan.primitive.scalar.Integer16.1.0"; });
+const auto reg_rw_cyphal_sub_orientation_x_id               = node_registry->expose("cyphal.sub.orientation_x.id",              {true}, port_id_orientation_x);
+const auto reg_ro_cyphal_sub_orientation_x_type             = node_registry->route ("cyphal.sub.orientation_x.type",            {true}, []() { return "uavcan.primitive.scalar.Real32.1.0"; });
+const auto reg_rw_cyphal_sub_calibration_id                 = node_registry->expose("cyphal.sub.calibration.id",                {true}, port_id_calibration);
+const auto reg_ro_cyphal_sub_calibration_type               = node_registry->route ("cyphal.sub.calibration.type",              {true}, []() { return "uavcan.primitive.array.Natural8.1.0"; });
 const auto reg_rw_pico_update_period_ms_inputvoltage        = node_registry->expose("pico.update_period_ms.inputvoltage",        {true}, update_period_ms_inputvoltage);
 const auto reg_rw_pico_update_period_ms_internaltemperature = node_registry->expose("pico.update_period_ms.internaltemperature", {true}, update_period_ms_internaltemperature);
 const auto reg_rw_pico_update_period_ms_analoginput0        = node_registry->expose("pico.update_period_ms.analoginput0",        {true}, update_period_ms_analoginput0);
@@ -287,7 +294,28 @@ void setup()
       {
         status_em_stop = msg.value;
       });
+  if (port_id_orientation_x != std::numeric_limits<CanardPortID>::max())
+    imu_orientation_x_subscription = node_hdl.create_subscription<uavcan::primitive::scalar::Real32_1_0>(
+      port_id_orientation_x,
+      [](uavcan::primitive::scalar::Real32_1_0 const & msg)
+      {
+        imu_orientation_x = msg.value;
+      });
+ if (port_id_calibration != std::numeric_limits<CanardPortID>::max())
+    imu_calibration_subscription = node_hdl.create_subscription<uavcan::primitive::array::Natural8_1_0>(
+      port_id_calibration,
+      [](uavcan::primitive::array::Natural8_1_0 const & msg)
+      {
+        for (size_t sid = 0; sid < msg.value.size(); sid++)
+        {
+          if (sid >= 4) {
+            DBG_WARNING("IMU status message contains more than %d entries", 4);
+            return;
+          }
 
+          imu_calibration[sid] = msg.value[sid];
+        }
+      });
 
     /* set factory settings */
     if(update_period_ms_inputvoltage==0xFFFF)        update_period_ms_inputvoltage=3*1000;
@@ -365,11 +393,12 @@ void setup()
 //  CanardFilter const CAN_FILTER_OUT_1   = canardMakeFilterForSubject(port_id_output1);
   CanardFilter const CAN_FILTER_LED     = canardMakeFilterForSubject(port_id_led1);
   CanardFilter const CAN_FILTER_EM_STOP = canardMakeFilterForSubject(port_id_em_stop);
+  CanardFilter const CAN_FILTER_IMU_CAL = canardMakeFilterForSubject(port_id_calibration);
+  CanardFilter const CAN_FILTER_IMU_ORI = canardMakeFilterForSubject(port_id_orientation_x);
 
   CanardFilter consolidated_filter = canardConsolidateFilters(&CAN_FILTER_LED, &CAN_FILTER_EM_STOP);
-//  CanardFilter consolidated_filter = canardConsolidateFilters(&CAN_FILTERCAN_FILTER_LED_OUT_0, &CAN_FILTER_OUT_1);
-//               consolidated_filter = canardConsolidateFilters(&consolidated_filter, &CAN_FILTER_LED);
-//               consolidated_filter = canardConsolidateFilters(&consolidated_filter, &CAN_FILTER_EM_STOP);
+               consolidated_filter = canardConsolidateFilters(&consolidated_filter, &CAN_FILTER_IMU_CAL);
+               consolidated_filter = canardConsolidateFilters(&consolidated_filter, &CAN_FILTER_IMU_ORI);
 
   DBG_INFO("CAN Filter #2\n\r\tExt. Mask : %8X\n\r\tExt. ID   : %8X",
            consolidated_filter.extended_mask,
@@ -396,16 +425,6 @@ void setup()
   tft.setTextColor(ST77XX_GREEN);
   tft.setTextSize(3);
   tft.println("Robotem Rovne");
-
-  if (!bno.begin())
-  {
-    DBG_ERROR("No BNO055 detected");
-    tft.setCursor(0, 90);
-    tft.setTextColor(ST77XX_RED);
-    tft.setTextSize(2);
-    tft.println("no BNO055!");
-//    while (1);
-  }
 
   /* Enable watchdog. */
 //  rp2040.wdt_begin(WATCHDOG_DELAY_ms);
@@ -442,7 +461,6 @@ void loop()
   static float heading_offset=0;
 
   static int pwm=0;
-  static sensors_event_t orientationData , linearAccelData;
 
   unsigned long const now = millis();
 
@@ -508,7 +526,6 @@ void loop()
   if((now - prev_sensor) > 100)
   {
     static int bno_count=0;
-    bno.getEvent(&orientationData, Adafruit_BNO055::VECTOR_EULER);
 
     if(status_em_stop==0)
     {
@@ -519,7 +536,7 @@ void loop()
     {
       if(bno_count<10)
       {
-        heading_soll+=orientationData.orientation.x;
+        heading_soll+=imu_orientation_x;
         bno_count++;
       }
       else if(bno_count==10)
@@ -539,7 +556,7 @@ void loop()
         }
         else
         {
-          heading_offset=heading_soll-orientationData.orientation.x;
+          heading_offset=heading_soll-imu_orientation_x;
           if(heading_offset<-360.0) heading_offset+=360.0;
           if(heading_offset>360.0) heading_offset-=360.0;
           uavcan_motor_0_pwm.value = 152-heading_offset*2.0;
@@ -571,25 +588,21 @@ void loop()
     tft.setTextColor(ST77XX_WHITE);
     tft.setTextSize(2);
     tft.setCursor(10, 90);
-    tft.print(orientationData.orientation.x);
+    tft.print(imu_orientation_x);
     tft.setCursor(10, 106);
     if(status_em_stop==1) tft.print(heading_soll);
 
     tft.fillRect(0,150,100,8,ST77XX_BLACK);
     tft.setTextColor(ST77XX_WHITE);
     tft.setTextSize(0);
-    uint8_t system, gyro, accel, mag;
-    system = gyro = accel = mag = 0;
-    bno.getCalibration(&system, &gyro, &accel, &mag);
-
     tft.setCursor(0, 150);
-    tft.print(system);
+    tft.print(imu_calibration[0]);
     tft.setCursor(20, 150);
-    tft.print(gyro);
+    tft.print(imu_calibration[1]);
     tft.setCursor(40, 150);
-    tft.print(accel);
+    tft.print(imu_calibration[2]);
     tft.setCursor(60, 150);
-    tft.print(mag);
+    tft.print(imu_calibration[3]);
 
     /* print circle and arrow */
     if(status_em_stop==1)
