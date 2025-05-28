@@ -619,20 +619,20 @@ void loop()
 //    tft.fillRect(0,150,100,8,ST77XX_BLACK);
     tft.setTextColor(ST77XX_WHITE);
     tft.setTextSize(0);
-    tft.setCursor(0, 150);
+    tft.setCursor(0, 152);
     tft.print(imu_calibration[0]);
-    tft.setCursor(20, 150);
+    tft.setCursor(16, 152);
     tft.print(imu_calibration[1]);
-    tft.setCursor(40, 150);
+    tft.setCursor(32, 152);
     tft.print(imu_calibration[2]);
-    tft.setCursor(60, 150);
+    tft.setCursor(48, 152);
     tft.print(imu_calibration[3]);
 
-    tft.setCursor(64, 120);
+    tft.setCursor(64, 132);
     tft.print(imu_coordinates[0],6);
-    tft.setCursor(64, 130);
+    tft.setCursor(64, 142);
     tft.print(imu_coordinates[1],6);
-    tft.setCursor(64, 140);
+    tft.setCursor(64, 152);
     tft.print(imu_coordinates[2]);
 
     /* print circle and arrow */
