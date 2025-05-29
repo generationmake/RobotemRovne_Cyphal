@@ -52,9 +52,6 @@ jobs:
             - source-url: https://github.com/adafruit/Adafruit_ZeroDMA.git
             - source-url: https://github.com/adafruit/Adafruit-GFX-Library.git
             - source-url: https://github.com/adafruit/Adafruit-ST7735-Library.git
-            - source-url: https://github.com/adafruit/Adafruit_BNO055.git
-            - source-url: https://github.com/adafruit/Adafruit_Sensor.git
-            - source-url: https://github.com/adafruit/Adafruit_BusIO.git
             - source-url: https://github.com/wuehr1999/NavigationOnArduino.git
             - source-url: https://github.com/EinarArnason/ArduinoQueue.git
           sketches-report-path: ${{ env.SKETCHES_REPORTS_PATH }}
