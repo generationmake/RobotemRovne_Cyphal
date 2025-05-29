@@ -116,8 +116,10 @@ float heading_distance=0;
 int robot_status=0;
 int display_event=0;
 //NavPoint dest(48.63326821391752, 13.026402339488873);
-//NavPoint dest(48.63337634289529, 13.02637819960948); 
-NavPoint dest(48.63323453435252, 13.026615575090181); 
+NavPoint dest(48.63337634289529, 13.02637819960948); 
+float dest_lat[]= {48.63340559085763, 48.63330455236653, 48.63323453435252};
+float dest_lon[]= {13.02690659474731, 13.027358546981308, 13.026615575090181};
+int dest_count=0;
 
 /* LITTLEFS/EEPROM ********************************************************************/
 
@@ -344,15 +346,22 @@ void setup()
 
           imu_coordinates[sid] = msg.value[sid];
           NavPoint pos(imu_coordinates[0], imu_coordinates[1]);
+          NavPoint dest2(dest_lat[dest_count], dest_lon[dest_count]);
           // distance
-          heading_distance = pos.calculateDistance(dest);
+          heading_distance = pos.calculateDistance(dest2);
           if(heading_distance<3.0) // reached target
           {
-            robot_status=0;
             display_event=1;
+            if(dest_count<3)
+            {
+//              dest.setCoordinates(dest_lat[dest_count], dest_lon[dest_count]);
+              dest_count++;
+              if(dest_count==3) robot_status=0;
+            }
+            else robot_status=0;
           }
           // heading
-          heading_soll = pos.calculateBearing(dest);
+          heading_soll = pos.calculateBearing(dest2);
         }
       });
 
@@ -474,6 +483,8 @@ void setup()
   DBG_INFO("Init complete.");
 
   robot_status=1;     // start robot follow
+//  dest.setCoordinates(dest_lat[dest_count], dest_lon[dest_count]);
+//  dest_count++;
 }
 
 void loop()
