@@ -613,7 +613,7 @@ void loop()
     tft.setCursor(0, 0);
     tft.print(millis() / 1000);
 
-    tft.fillRect(0,90,128,77,ST77XX_BLACK);
+    tft.fillRect(0,80,128,79,ST77XX_BLACK);
     tft.setCursor(0, 140);
     if(status_em_stop==0) tft.setTextColor(ST77XX_RED);
     else tft.setTextColor(ST77XX_GREEN);
