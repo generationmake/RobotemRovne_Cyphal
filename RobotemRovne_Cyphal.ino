@@ -116,7 +116,7 @@ float heading_distance=0;
 int robot_status=0;
 int display_event=0;
 //NavPoint dest(48.63326821391752, 13.026402339488873);
-NavPoint dest(48.63337634289529, 13.02637819960948); 
+NavPoint dest(48.63337634289529, 13.02637819960948);
 float dest_lat[]= {48.63340559085763, 48.63330455236653, 48.63323453435252};
 float dest_lon[]= {13.02690659474731, 13.027358546981308, 13.026615575090181};
 int dest_count=0;
@@ -634,7 +634,7 @@ void loop()
     {
       if(display_count==0) display_count=10;
       if(display_count>1) display_count--;
-      else 
+      else
       {
         display_event=0;
         display_count=0;
