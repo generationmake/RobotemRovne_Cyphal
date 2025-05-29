@@ -113,8 +113,11 @@ uint8_t imu_calibration[] = { 0, 0, 0, 0 };
 float imu_coordinates[] = { 0.0, 0.0, 0.0 };
 float heading_soll=0;
 float heading_distance=0;
+int robot_status=0;
+int display_event=0;
 //NavPoint dest(48.63326821391752, 13.026402339488873);
-NavPoint dest(48.63337634289529, 13.02637819960948);
+//NavPoint dest(48.63337634289529, 13.02637819960948); 
+NavPoint dest(48.63323453435252, 13.026615575090181); 
 
 /* LITTLEFS/EEPROM ********************************************************************/
 
@@ -343,6 +346,11 @@ void setup()
           NavPoint pos(imu_coordinates[0], imu_coordinates[1]);
           // distance
           heading_distance = pos.calculateDistance(dest);
+          if(heading_distance<3.0) // reached target
+          {
+            robot_status=0;
+            display_event=1;
+          }
           // heading
           heading_soll = pos.calculateBearing(dest);
         }
@@ -464,6 +472,8 @@ void setup()
 //  rp2040.wdt_reset();
 
   DBG_INFO("Init complete.");
+
+  robot_status=1;     // start robot follow
 }
 
 void loop()
@@ -607,60 +617,81 @@ void loop()
   /* update display function - every 200 ms */
   if((now - prev_display) > 200)
   {
-    tft.fillRect(0,0,24,8,ST77XX_BLACK);
-    tft.setTextColor(ST77XX_WHITE);
-    tft.setTextSize(0);
-    tft.setCursor(0, 0);
-    tft.print(millis() / 1000);
+    static int display_count=0;
 
-    tft.fillRect(0,80,128,79,ST77XX_BLACK);
-    tft.setCursor(0, 140);
-    if(status_em_stop==0) tft.setTextColor(ST77XX_RED);
-    else tft.setTextColor(ST77XX_GREEN);
-    tft.print("STOP");
-
-//    tft.fillRect(0,90,128,77,ST77XX_BLACK);
-    tft.setTextColor(ST77XX_WHITE);
-    tft.setTextSize(2);
-    tft.setCursor(0, 80);
-    tft.print(imu_orientation_x);
-    if(status_em_stop==1) tft.setTextColor(ST77XX_WHITE);
-    else tft.setTextColor(0x4208);
-    tft.setCursor(0, 96);
-    tft.print(heading_soll);
-    tft.setCursor(0, 112);
-    tft.print(heading_distance);
-
-//    tft.fillRect(0,150,100,8,ST77XX_BLACK);
-    tft.setTextColor(ST77XX_WHITE);
-    tft.setTextSize(0);
-    tft.setCursor(0, 152);
-    tft.print(imu_calibration[0]);
-    tft.setCursor(16, 152);
-    tft.print(imu_calibration[1]);
-    tft.setCursor(32, 152);
-    tft.print(imu_calibration[2]);
-    tft.setCursor(48, 152);
-    tft.print(imu_calibration[3]);
-
-    tft.setCursor(64, 132);
-    tft.print(imu_coordinates[0],6);
-    tft.setCursor(64, 142);
-    tft.print(imu_coordinates[1],6);
-    tft.setCursor(64, 152);
-    tft.print(imu_coordinates[2]);
-
-    /* print circle and arrow */
-//    if(status_em_stop==1)
+    if(display_event==1)
     {
-      int circle_x=64;
-      int circle_y=40;
-      int circle_r=30;
+      if(display_count==0) display_count=10;
+      if(display_count>1) display_count--;
+      else 
+      {
+        display_event=0;
+        display_count=0;
+      }
+      tft.fillScreen(ST77XX_GREEN);
+    }
+    else
+    {
+      tft.fillRect(0,0,24,8,ST77XX_BLACK);
+      tft.setTextColor(ST77XX_WHITE);
+      tft.setTextSize(0);
+      tft.setCursor(0, 0);
+      tft.print(millis() / 1000);
 
-      tft.fillCircle(circle_x, circle_y, circle_r, ST77XX_BLACK);
-      tft.drawCircle(circle_x, circle_y, circle_r, ST77XX_WHITE);
-      float circle_heading=heading_offset*1.0;
-      tft.fillTriangle((circle_x+circle_r*sin(circle_heading*DEG_TO_RAD)), (circle_y-circle_r*cos(circle_heading*DEG_TO_RAD)), (circle_x+circle_r*sin((circle_heading+150.0)*DEG_TO_RAD)), (circle_y-circle_r*cos((circle_heading+150.0)*DEG_TO_RAD)), (circle_x+circle_r*sin((circle_heading-150.0)*DEG_TO_RAD)), (circle_y-circle_r*cos((circle_heading-150.0)*DEG_TO_RAD)), ST77XX_BLUE);
+      tft.fillRect(0,80,128,79,ST77XX_BLACK);
+      tft.setCursor(0, 142);
+      if(status_em_stop==0) tft.setTextColor(ST77XX_RED);
+      else tft.setTextColor(ST77XX_GREEN);
+      tft.print("STOP");
+
+      tft.setCursor(0, 132);
+      tft.setTextColor(ST77XX_BLUE);
+      if(robot_status==1) tft.print("FOLLOW");
+      else tft.print("FINISHED");
+
+  //    tft.fillRect(0,90,128,77,ST77XX_BLACK);
+      tft.setTextColor(ST77XX_WHITE);
+      tft.setTextSize(2);
+      tft.setCursor(0, 80);
+      tft.print(imu_orientation_x);
+      if(status_em_stop==1) tft.setTextColor(ST77XX_WHITE);
+      else tft.setTextColor(0x4208);
+      tft.setCursor(0, 96);
+      tft.print(heading_soll);
+      tft.setCursor(0, 112);
+      tft.print(heading_distance);
+
+  //    tft.fillRect(0,150,100,8,ST77XX_BLACK);
+      tft.setTextColor(ST77XX_WHITE);
+      tft.setTextSize(0);
+      tft.setCursor(0, 152);
+      tft.print(imu_calibration[0]);
+      tft.setCursor(16, 152);
+      tft.print(imu_calibration[1]);
+      tft.setCursor(32, 152);
+      tft.print(imu_calibration[2]);
+      tft.setCursor(48, 152);
+      tft.print(imu_calibration[3]);
+
+      tft.setCursor(64, 132);
+      tft.print(imu_coordinates[0],6);
+      tft.setCursor(64, 142);
+      tft.print(imu_coordinates[1],6);
+      tft.setCursor(64, 152);
+      tft.print(imu_coordinates[2]);
+
+      /* print circle and arrow */
+  //    if(status_em_stop==1)
+      {
+        int circle_x=64;
+        int circle_y=40;
+        int circle_r=30;
+
+        tft.fillCircle(circle_x, circle_y, circle_r, ST77XX_BLACK);
+        tft.drawCircle(circle_x, circle_y, circle_r, ST77XX_WHITE);
+        float circle_heading=heading_offset*1.0;
+        tft.fillTriangle((circle_x+circle_r*sin(circle_heading*DEG_TO_RAD)), (circle_y-circle_r*cos(circle_heading*DEG_TO_RAD)), (circle_x+circle_r*sin((circle_heading+150.0)*DEG_TO_RAD)), (circle_y-circle_r*cos((circle_heading+150.0)*DEG_TO_RAD)), (circle_x+circle_r*sin((circle_heading-150.0)*DEG_TO_RAD)), (circle_y-circle_r*cos((circle_heading-150.0)*DEG_TO_RAD)), ST77XX_BLUE);
+      }
     }
 
     prev_display = now;
