@@ -117,8 +117,11 @@ int robot_status=0;
 int display_event=0;
 //NavPoint dest(48.63326821391752, 13.026402339488873);
 NavPoint dest(48.63337634289529, 13.02637819960948);
-float dest_lat[]= {48.63340559085763, 48.63330455236653, 48.63323453435252};
-float dest_lon[]= {13.02690659474731, 13.027358546981308, 13.026615575090181};
+//float dest_lat[]= {48.63340559085763, 48.63330455236653, 48.63323453435252};
+//float dest_lon[]= {13.02690659474731, 13.027358546981308, 13.026615575090181};
+float dest_lat[]= {48.63147120043003, 48.6311822541928, 48.631240752644366, 48.631258479434464};
+float dest_lon[]= {13.026188433249485, 13.02608650931427, 13.025888025861484, 13.026427149834598};
+int dest_len=4;
 int dest_count=0;
 
 /* LITTLEFS/EEPROM ********************************************************************/
@@ -352,11 +355,11 @@ void setup()
           if(heading_distance<3.0) // reached target
           {
             display_event=1;
-            if(dest_count<3)
+            if(dest_count<dest_len)
             {
 //              dest.setCoordinates(dest_lat[dest_count], dest_lon[dest_count]);
               dest_count++;
-              if(dest_count==3) robot_status=0;
+              if(dest_count==dest_len) robot_status=0;
             }
             else robot_status=0;
           }
