@@ -585,8 +585,8 @@ void loop()
     static int bno_count=0;
 
     heading_offset=heading_soll-imu_orientation_x;
-    if(heading_offset<-360.0) heading_offset+=360.0;
-    if(heading_offset>360.0) heading_offset-=360.0;
+    if(heading_offset<-180.0) heading_offset+=360.0;
+    if(heading_offset>180.0) heading_offset-=360.0;
 
     if(status_em_stop==0)
     {
