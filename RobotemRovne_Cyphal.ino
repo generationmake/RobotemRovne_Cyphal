@@ -583,15 +583,21 @@ void loop()
   if((now - prev_sensor) > 100)
   {
     static int bno_count=0;
+    uavcan::primitive::scalar::Integer16_1_0 uavcan_motor_0_pwm;
+    uavcan::primitive::scalar::Integer16_1_0 uavcan_motor_1_pwm;
 
     heading_offset=heading_soll-imu_orientation_x;
     if(heading_offset<-180.0) heading_offset+=360.0;
     if(heading_offset>180.0) heading_offset-=360.0;
 
-    if(status_em_stop==0)
+    if((status_em_stop==0)||(robot_status==0))
     {
       bno_count=0;
 //      heading_soll=0;
+      uavcan_motor_0_pwm.value = 0;
+      uavcan_motor_1_pwm.value = 0;
+      if(motor_0_pwm_pub) motor_0_pwm_pub->publish(uavcan_motor_0_pwm);
+      if(motor_1_pwm_pub) motor_1_pwm_pub->publish(uavcan_motor_1_pwm);
     }
     else
     {
@@ -607,8 +613,6 @@ void loop()
       }
       else
       {
-        uavcan::primitive::scalar::Integer16_1_0 uavcan_motor_0_pwm;
-        uavcan::primitive::scalar::Integer16_1_0 uavcan_motor_1_pwm;
         if(pwm<150)
         {
           pwm+=5;
