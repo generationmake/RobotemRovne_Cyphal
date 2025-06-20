@@ -121,6 +121,7 @@ NavPoint dest(48.63337634289529, 13.02637819960948);
 //float dest_lon[]= {13.02690659474731, 13.027358546981308, 13.026615575090181};
 float dest_lat[]= {48.63147120043003, 48.6311822541928, 48.631240752644366, 48.631258479434464};
 float dest_lon[]= {13.026188433249485, 13.02608650931427, 13.025888025861484, 13.026427149834598};
+int dest_ball[]={1,0,0,1};
 int dest_len=4;
 int dest_count=0;
 
@@ -354,12 +355,17 @@ void setup()
           heading_distance = pos.calculateDistance(dest2);
           if(heading_distance<3.0) // reached target
           {
-            display_event=1;
+            if(dest_ball[dest_count]==1) display_event=2; // distribute ball
+            else display_event=1;
             if(dest_count<dest_len)
             {
 //              dest.setCoordinates(dest_lat[dest_count], dest_lon[dest_count]);
               dest_count++;
-              if(dest_count==dest_len) robot_status=0;
+              if(dest_count==dest_len) // final waypoint
+              {
+                robot_status=0;
+                display_event=3;
+              }
             }
             else robot_status=0;
           }
@@ -637,7 +643,7 @@ void loop()
   {
     static int display_count=0;
 
-    if(display_event==1)
+    if(display_event>0)
     {
       if(display_count==0) display_count=10;
       if(display_count>1) display_count--;
@@ -646,7 +652,9 @@ void loop()
         display_event=0;
         display_count=0;
       }
-      tft.fillScreen(ST77XX_GREEN);
+      if(display_event==1) tft.fillScreen(ST77XX_GREEN);
+      else if(display_event==2) tft.fillScreen(ST77XX_BLUE);
+      else tft.fillScreen(ST77XX_RED);
     }
     else
     {
