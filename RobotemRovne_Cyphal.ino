@@ -119,19 +119,23 @@ float heading_soll=0;
 float heading_distance=0;
 int robot_status=0;
 int display_event=0;
-//NavPoint dest(48.63326821391752, 13.026402339488873);
-NavPoint dest(48.63337634289529, 13.02637819960948);
+
 //forsthart friedhof
 //float dest_lat[]= {48.63340559085763, 48.63330455236653, 48.63323453435252, 48.63340559085763};
 //float dest_lon[]= {13.02690659474731, 13.027358546981308, 13.026615575090181, 13.02690659474731};
 //forsthart fussballplatz
 //float dest_lat[]= {48.63147120043003, 48.6311822541928, 48.631240752644366, 48.631258479434464};
 //float dest_lon[]= {13.026188433249485, 13.02608650931427, 13.025888025861484, 13.026427149834598};
+struct waypoints {float lat; float lon; int ball;};
 //roboorienteering 1 - 2 - H1 - cil
-float dest_lat[]= {49.9539450, 49.9537240, 49.95371226687975, 49.953249763643925};
-float dest_lon[]= {12.708882,  12.709185,  12.709064856056779, 12.709290161620979};
-int dest_ball[]={1,1,0,0};
-int dest_len=4;
+struct waypoints w[]={ 
+  { 49.95394955693399, 12.709094360404922, 0},   // H0
+  { 49.9539450 , 12.708882, 1},   // 1
+  { 49.9537240 , 12.709185, 1},   // 2
+  { 49.9537122 , 12.709064, 0},   // H1
+  { 49.9534230 , 12.709187, 0},   // CIL
+  { 49.9532497 , 12.709290, 0}    // CIL - after
+};
 int dest_count=0;
 
 /* LITTLEFS/EEPROM ********************************************************************/
@@ -359,18 +363,18 @@ void setup()
 
           imu_coordinates[sid] = msg.value[sid];
           NavPoint pos(imu_coordinates[0], imu_coordinates[1]);
-          NavPoint dest2(dest_lat[dest_count], dest_lon[dest_count]);
+          NavPoint dest2(w[dest_count].lat, w[dest_count].lon);
           // distance
           heading_distance = pos.calculateDistance(dest2);
           if(heading_distance<3.0) // reached target
           {
-            if(dest_ball[dest_count]==1) display_event=2; // distribute ball
+            if(w[dest_count].ball==1) display_event=2; // distribute ball
             else display_event=1;
-            if(dest_count<dest_len)
+            if(dest_count<(sizeof(w)/sizeof(w[0])))
             {
 //              dest.setCoordinates(dest_lat[dest_count], dest_lon[dest_count]);
               dest_count++;
-              if(dest_count==dest_len) // final waypoint
+              if(dest_count==(sizeof(w)/sizeof(w[0]))) // final waypoint
               {
                 robot_status=0;
                 display_event=3;
@@ -668,7 +672,7 @@ void loop()
       }
       if(display_event==1) tft.fillScreen(ST77XX_GREEN);
       else if(display_event==2) tft.fillScreen(ST77XX_BLUE);
-      else tft.fillScreen(ST77XX_RED);
+      else if(display_event==3) tft.fillScreen(ST77XX_RED);
     }
     else
     {
