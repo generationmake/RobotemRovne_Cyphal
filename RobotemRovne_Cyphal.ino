@@ -121,11 +121,16 @@ int robot_status=0;
 int display_event=0;
 //NavPoint dest(48.63326821391752, 13.026402339488873);
 NavPoint dest(48.63337634289529, 13.02637819960948);
-float dest_lat[]= {48.63340559085763, 48.63330455236653, 48.63323453435252, 48.63340559085763};
-float dest_lon[]= {13.02690659474731, 13.027358546981308, 13.026615575090181, 13.02690659474731};
+//forsthart friedhof
+//float dest_lat[]= {48.63340559085763, 48.63330455236653, 48.63323453435252, 48.63340559085763};
+//float dest_lon[]= {13.02690659474731, 13.027358546981308, 13.026615575090181, 13.02690659474731};
+//forsthart fussballplatz
 //float dest_lat[]= {48.63147120043003, 48.6311822541928, 48.631240752644366, 48.631258479434464};
 //float dest_lon[]= {13.026188433249485, 13.02608650931427, 13.025888025861484, 13.026427149834598};
-int dest_ball[]={1,0,0,1};
+//roboorienteering 1 - 2 - H1 - cil
+float dest_lat[]= {49.9539450, 49.9537240, 49.95371226687975, 49.953249763643925};
+float dest_lon[]= {12.708882,  12.709185,  12.709064856056779, 12.709290161620979};
+int dest_ball[]={1,1,0,0};
 int dest_len=4;
 int dest_count=0;
 
@@ -424,8 +429,8 @@ void setup()
 //  digitalWrite(OUTPUT_1_PIN, LOW);
 
   /* Setup SERVO0. */
-  servo_0.attach(SERVO_0_PIN, 800, 2200);
-  servo_0.writeMicroseconds(1500);
+  servo_0.attach(SERVO_0_PIN, 700, 2200);
+  servo_0.writeMicroseconds(700);
 
   /* Setup SPI access */
   SPI.begin();
@@ -653,7 +658,7 @@ void loop()
 
     if(display_event>0)
     {
-      if(display_event==2) servo_0.writeMicroseconds(800);
+      if(display_event==2) servo_0.writeMicroseconds(2000);
       if(display_count==0) display_count=10;
       if(display_count>1) display_count--;
       else
@@ -667,7 +672,7 @@ void loop()
     }
     else
     {
-      servo_0.writeMicroseconds(2100);
+      servo_0.writeMicroseconds(700);
       tft.fillRect(0,0,24,8,ST77XX_BLACK);
       tft.setTextColor(ST77XX_WHITE);
       tft.setTextSize(0);
