@@ -15,6 +15,7 @@
 #include <Adafruit_ST7735.h> // Hardware-specific library for ST7735
 #include <SPI.h>
 #include <Wire.h>
+#include <Servo.h>
 
 #include <107-Arduino-Cyphal.h>
 #include <107-Arduino-Cyphal-Support.h>
@@ -47,6 +48,7 @@ using namespace uavcan::node;
 
 static uint8_t const EEPROM_I2C_DEV_ADDR = 0x50;
 
+static int const SERVO_0_PIN        = 14;
 static int const MCP2515_CS_PIN     = 17;
 static int const MCP2515_INT_PIN    = 20;
 static int const LED_2_PIN          = 21; /* GP21 */
@@ -107,6 +109,8 @@ cyphal::Subscription imu_coordinates_subscription;
 
 cyphal::ServiceServer execute_command_srv = node_hdl.create_service_server<ExecuteCommand::Request_1_1, ExecuteCommand::Response_1_1>(2*1000*1000UL, onExecuteCommand_1_1_Request_Received);
 
+Servo servo_0;
+
 bool status_em_stop = 0;
 float imu_orientation_x = 0.0;
 uint8_t imu_calibration[] = { 0, 0, 0, 0 };
@@ -117,10 +121,10 @@ int robot_status=0;
 int display_event=0;
 //NavPoint dest(48.63326821391752, 13.026402339488873);
 NavPoint dest(48.63337634289529, 13.02637819960948);
-//float dest_lat[]= {48.63340559085763, 48.63330455236653, 48.63323453435252};
-//float dest_lon[]= {13.02690659474731, 13.027358546981308, 13.026615575090181};
-float dest_lat[]= {48.63147120043003, 48.6311822541928, 48.631240752644366, 48.631258479434464};
-float dest_lon[]= {13.026188433249485, 13.02608650931427, 13.025888025861484, 13.026427149834598};
+float dest_lat[]= {48.63340559085763, 48.63330455236653, 48.63323453435252, 48.63340559085763};
+float dest_lon[]= {13.02690659474731, 13.027358546981308, 13.026615575090181, 13.02690659474731};
+//float dest_lat[]= {48.63147120043003, 48.6311822541928, 48.631240752644366, 48.631258479434464};
+//float dest_lon[]= {13.026188433249485, 13.02608650931427, 13.025888025861484, 13.026427149834598};
 int dest_ball[]={1,0,0,1};
 int dest_len=4;
 int dest_count=0;
@@ -419,6 +423,10 @@ void setup()
 //  digitalWrite(OUTPUT_0_PIN, LOW);
 //  digitalWrite(OUTPUT_1_PIN, LOW);
 
+  /* Setup SERVO0. */
+  servo_0.attach(SERVO_0_PIN, 800, 2200);
+  servo_0.writeMicroseconds(1500);
+
   /* Setup SPI access */
   SPI.begin();
   SPI.beginTransaction(MCP2515x_SPI_SETTING);
@@ -645,6 +653,7 @@ void loop()
 
     if(display_event>0)
     {
+      if(display_event==2) servo_0.writeMicroseconds(800);
       if(display_count==0) display_count=10;
       if(display_count>1) display_count--;
       else
@@ -658,6 +667,7 @@ void loop()
     }
     else
     {
+      servo_0.writeMicroseconds(2100);
       tft.fillRect(0,0,24,8,ST77XX_BLACK);
       tft.setTextColor(ST77XX_WHITE);
       tft.setTextSize(0);
