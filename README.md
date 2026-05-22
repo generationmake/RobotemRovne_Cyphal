@@ -46,7 +46,7 @@ Code for the Robot for the Robotem Rovne Contest based on the Cyphal protocol
 | 14      | GP10         | SPI1_CLK      | SPI for display                  |
 | 15      | GP11         | SPI1_MOSI     | SPI for display                  |
 | 16      | GP12         | SPI1_MISO     | SPI for display                  |
-| 17      | GP13         | reserved      |                                  |
+| 17      | GP13         | ROT_SW        | rotary encoder switch            |
 | 18      | GND          | GND           |                                  |
 | 19      | GP14         | SERVO0        | servo 0                          |
 | 20      | GP15         | SERVO1        | servo 1                          |
@@ -61,9 +61,9 @@ Code for the Robot for the Robotem Rovne Contest based on the Cyphal protocol
 | 29      | GP22         | STATUS_LED3   | internal status LED 3            |
 | 30      | RUN          | RESET         | Reset for Board                  |
 | 31      | GP26         | INPUT_VOLTAGE | measure input voltage            |
-| 32      | GP27         | ANALOG_INPUT0 | analog input                     |
+| 32      | GP27         | ROT_A         | rotary encoder A                 |
 | 33      | GND          | GND           |                                  |
-| 34      | GP28         | ANALOG_INPUT1 | analog input                     |
+| 34      | GP28         | ROT_B         | rotary encoder B                 |
 | 35      | ADC_VREF     |               |                                  |
 | 36      | 3V3 (OUT)    | 3V3-rail      | supply voltage for board         |
 | 37      | 3V3_EN       |               |                                  |

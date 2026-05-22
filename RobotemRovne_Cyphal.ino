@@ -23,6 +23,7 @@
 #include <107-Arduino-MCP2515.h>
 #include <107-Arduino-littlefs.h>
 #include <107-Arduino-24LCxx.hpp>
+#include "pio_encoder.h"
 #include <NavPoint.h>
 
 #define DBG_ENABLE_ERROR
@@ -48,14 +49,15 @@ using namespace uavcan::node;
 
 static uint8_t const EEPROM_I2C_DEV_ADDR = 0x50;
 
+static int const ENCODER_SW         = 12;
 static int const SERVO_0_PIN        = 14;
 static int const MCP2515_CS_PIN     = 17;
 static int const MCP2515_INT_PIN    = 20;
 static int const LED_2_PIN          = 21; /* GP21 */
 static int const LED_3_PIN          = 22; /* GP22 */
 static int const ANALOG_PIN         = 26;
-static int const ANALOG_INPUT_0_PIN = 27;
-static int const ANALOG_INPUT_1_PIN = 28;
+static int const ENCODER_A          = 27;
+static int const ENCODER_B          = 28;
   #define TFT_CS         6
   #define TFT_RST        9 // Or set to -1 and connect to Arduino RESET pin
   #define TFT_DC         7
@@ -78,6 +80,7 @@ ExecuteCommand::Response_1_1 onExecuteCommand_1_1_Request_Received(ExecuteComman
  **************************************************************************************/
 
 Adafruit_ST7735 tft = Adafruit_ST7735(&SPI1, TFT_CS, TFT_DC, TFT_RST);
+PioEncoder encoder(ENCODER_A, false, 0, COUNT_1X, pio0);
 
 DEBUG_INSTANCE(80, Serial);
 
@@ -513,6 +516,10 @@ void setup()
   /* Leave configuration and enable MCP2515. */
   mcp2515.setNormalMode();
 
+  /* configure encoder input */
+  pinMode(ENCODER_SW, INPUT);
+  encoder.begin();
+
   // Use this initializer if using a 1.8" TFT screen:
   tft.initR(INITR_BLACKTAB);      // Init ST7735S chip, black tab
   tft.fillScreen(ST77XX_BLACK);
@@ -606,17 +613,17 @@ void loop()
 
   if((now - prev_analog_input0) > update_period_ms_analoginput0)
   {
-    uavcan::primitive::scalar::Integer16_1_0 uavcan_analog_input0;
-    uavcan_analog_input0.value = analogRead(ANALOG_INPUT_0_PIN);
-    if(analog_input_0_pub) analog_input_0_pub->publish(uavcan_analog_input0);
+  //  uavcan::primitive::scalar::Integer16_1_0 uavcan_analog_input0;
+  //  uavcan_analog_input0.value = analogRead(ANALOG_INPUT_0_PIN);
+  //  if(analog_input_0_pub) analog_input_0_pub->publish(uavcan_analog_input0);
 
     prev_analog_input0 = now;
   }
   if((now - prev_analog_input1) > update_period_ms_analoginput1)
   {
-    uavcan::primitive::scalar::Integer16_1_0 uavcan_analog_input1;
-    uavcan_analog_input1.value = analogRead(ANALOG_INPUT_1_PIN);
-    if(analog_input_1_pub) analog_input_1_pub->publish(uavcan_analog_input1);
+  //  uavcan::primitive::scalar::Integer16_1_0 uavcan_analog_input1;
+  //  uavcan_analog_input1.value = analogRead(ANALOG_INPUT_1_PIN);
+  //  if(analog_input_1_pub) analog_input_1_pub->publish(uavcan_analog_input1);
 
     prev_analog_input1 = now;
   }
@@ -701,6 +708,11 @@ void loop()
       tft.setTextSize(0);
       tft.setCursor(0, 0);
       tft.print(millis() / 1000);
+      tft.fillRect(64,0,24,8,ST77XX_BLACK);
+      tft.setCursor(64, 0);
+      if(digitalRead(ENCODER_SW)) tft.setTextColor(ST77XX_RED);
+      else tft.setTextColor(ST77XX_BLUE);
+      tft.print(encoder.getCount());
 
       tft.fillRect(0,80,128,79,ST77XX_BLACK);
       tft.setCursor(0, 142);
