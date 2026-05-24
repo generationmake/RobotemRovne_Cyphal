@@ -55,6 +55,7 @@ jobs:
             - source-url: https://github.com/adafruit/Adafruit_BusIO.git
             - source-url: https://github.com/wuehr1999/NavigationOnArduino.git
             - source-url: https://github.com/EinarArnason/ArduinoQueue.git
+            - source-url: https://github.com/gbr1/rp2040-encoder-library.git
           sketches-report-path: ${{ env.SKETCHES_REPORTS_PATH }}
           sketch-paths: ./
 
