@@ -405,7 +405,8 @@ void setup()
             else robot_status=0;
           }
           // heading
-          heading_soll = pos.calculateBearing(dest2);
+//          heading_soll = pos.calculateBearing(dest2);
+          heading_soll = -72.0;
         }
       });
 
@@ -713,6 +714,7 @@ void loop()
       if(digitalRead(ENCODER_SW)) tft.setTextColor(ST77XX_RED);
       else tft.setTextColor(ST77XX_BLUE);
       tft.print(encoder.getCount());
+      heading_soll=-72.0+0.05*encoder.getCount();
 
       tft.fillRect(0,80,128,79,ST77XX_BLACK);
       tft.setCursor(0, 142);
