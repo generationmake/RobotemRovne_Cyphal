@@ -40,13 +40,13 @@ Code for the Robot for the Robotem Rovne Contest based on the Cyphal protocol
 | 8       | GND          | GND           |                                  |
 | 9       | GP6          | TFT_CS        | display CS                       |
 | 10      | GP7          | TFT_DC        | display DC                       |
-| 11      | GP8          | reserved      |                                  |
+| 11      | GP8          | ROT_SW        | rotary encoder switch            |
 | 12      | GP9          | TFT_RST       | display RST                      |
 | 13      | GND          | GND           |                                  |
 | 14      | GP10         | SPI1_CLK      | SPI for display                  |
 | 15      | GP11         | SPI1_MOSI     | SPI for display                  |
 | 16      | GP12         | SPI1_MISO     | SPI for display                  |
-| 17      | GP13         | ROT_SW        | rotary encoder switch            |
+| 17      | GP13         | reserved      |                                  |
 | 18      | GND          | GND           |                                  |
 | 19      | GP14         | SERVO0        | servo 0                          |
 | 20      | GP15         | SERVO1        | servo 1                          |

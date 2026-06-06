@@ -49,7 +49,7 @@ using namespace uavcan::node;
 
 static uint8_t const EEPROM_I2C_DEV_ADDR = 0x50;
 
-static int const ENCODER_SW         = 12;
+static int const ENCODER_SW         = 8;
 static int const SERVO_0_PIN        = 14;
 static int const MCP2515_CS_PIN     = 17;
 static int const MCP2515_INT_PIN    = 20;
