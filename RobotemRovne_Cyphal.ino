@@ -120,6 +120,7 @@ float imu_coordinates[] = { 0.0, 0.0, 0.0 };
 float heading_soll=0;
 float heading_default = -72.0;
 float heading_distance=0;
+float speed_default = 150.0;
 int robot_status=0;
 int display_event=0;
 
@@ -599,19 +600,17 @@ void loop()
       ramp=0.0;   // reset motor speed for soft start after emergency stop
       uavcan_motor_0_pwm.value = 0;
       uavcan_motor_1_pwm.value = 0;
-      if(motor_0_pwm_pub) motor_0_pwm_pub->publish(uavcan_motor_0_pwm);
-      if(motor_1_pwm_pub) motor_1_pwm_pub->publish(uavcan_motor_1_pwm);
     }
     else
     {
       if(ramp<1.0) ramp+=0.03;
       else ramp=1.0;
 
-      uavcan_motor_0_pwm.value = ramp*(152-heading_offset*2.0);
-      uavcan_motor_1_pwm.value = ramp*(150+heading_offset*2.0);
-      if(motor_0_pwm_pub) motor_0_pwm_pub->publish(uavcan_motor_0_pwm);
-      if(motor_1_pwm_pub) motor_1_pwm_pub->publish(uavcan_motor_1_pwm);
+      uavcan_motor_0_pwm.value = ramp*(speed_default-heading_offset*2.0);
+      uavcan_motor_1_pwm.value = ramp*(speed_default+heading_offset*2.0);
     }
+    if(motor_0_pwm_pub) motor_0_pwm_pub->publish(uavcan_motor_0_pwm);
+    if(motor_1_pwm_pub) motor_1_pwm_pub->publish(uavcan_motor_1_pwm);
 
     prev_sensor = now;
   }
