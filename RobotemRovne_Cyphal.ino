@@ -540,8 +540,6 @@ void loop()
 //  static float heading_soll=0;
   static float heading_offset=0;
 
-  static int pwm=0;
-
   unsigned long const now = millis();
 
   /* Publish the heartbeat once/second */
@@ -590,6 +588,7 @@ void loop()
   {
     uavcan::primitive::scalar::Integer16_1_0 uavcan_motor_0_pwm;
     uavcan::primitive::scalar::Integer16_1_0 uavcan_motor_1_pwm;
+    static float ramp=0.0;
 
     heading_offset=heading_soll-imu_orientation_x;
     if(heading_offset<-180.0) heading_offset+=360.0;
@@ -597,7 +596,7 @@ void loop()
 
     if((status_em_stop==0)||(robot_status==0))
     {
-      pwm=0;   // reset motor speed for soft start after emergency stop
+      ramp=0.0;   // reset motor speed for soft start after emergency stop
       uavcan_motor_0_pwm.value = 0;
       uavcan_motor_1_pwm.value = 0;
       if(motor_0_pwm_pub) motor_0_pwm_pub->publish(uavcan_motor_0_pwm);
@@ -605,17 +604,11 @@ void loop()
     }
     else
     {
-      if(pwm<150)
-      {
-        pwm+=5;
-        uavcan_motor_0_pwm.value = pwm;
-        uavcan_motor_1_pwm.value = pwm;
-      }
-      else
-      {
-        uavcan_motor_0_pwm.value = 152-heading_offset*2.0;
-        uavcan_motor_1_pwm.value = 150+heading_offset*2.0;
-      }
+      if(ramp<1.0) ramp+=0.03;
+      else ramp=1.0;
+
+      uavcan_motor_0_pwm.value = ramp*(152-heading_offset*2.0);
+      uavcan_motor_1_pwm.value = ramp*(150+heading_offset*2.0);
       if(motor_0_pwm_pub) motor_0_pwm_pub->publish(uavcan_motor_0_pwm);
       if(motor_1_pwm_pub) motor_1_pwm_pub->publish(uavcan_motor_1_pwm);
     }
