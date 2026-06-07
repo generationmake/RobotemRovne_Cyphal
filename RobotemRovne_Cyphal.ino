@@ -100,8 +100,6 @@ cyphal::Node node_hdl(node_heap.data(), node_heap.size(), micros, [] (CanardFram
 cyphal::Publisher<Heartbeat_1_0> heartbeat_pub = node_hdl.create_publisher<Heartbeat_1_0>(1*1000*1000UL /* = 1 sec in usecs. */);
 cyphal::Publisher<uavcan::primitive::scalar::Real32_1_0> input_voltage_pub;
 cyphal::Publisher<uavcan::primitive::scalar::Real32_1_0> internal_temperature_pub;
-cyphal::Publisher<uavcan::primitive::scalar::Integer16_1_0> analog_input_0_pub;
-cyphal::Publisher<uavcan::primitive::scalar::Integer16_1_0> analog_input_1_pub;
 cyphal::Publisher<uavcan::primitive::scalar::Integer16_1_0> motor_0_pwm_pub;
 cyphal::Publisher<uavcan::primitive::scalar::Integer16_1_0> motor_1_pwm_pub;
 
@@ -120,6 +118,7 @@ float imu_orientation_x = 0.0;
 uint8_t imu_calibration[] = { 0, 0, 0, 0 };
 float imu_coordinates[] = { 0.0, 0.0, 0.0 };
 float heading_soll=0;
+float heading_default = -72.0;
 float heading_distance=0;
 int robot_status=0;
 int display_event=0;
@@ -368,8 +367,10 @@ void setup()
             DBG_WARNING("IMU coordinates message contains more than %d entries", 4);
             return;
           }
-
           imu_coordinates[sid] = msg.value[sid];
+        }
+        if(robot_status==1) // in follow mode
+        {
           NavPoint pos(imu_coordinates[0], imu_coordinates[1]);
           NavPoint dest2(w[dest_count].lat, w[dest_count].lon);
           // distance
@@ -391,8 +392,7 @@ void setup()
             else robot_status=0;
           }
           // heading
-//          heading_soll = pos.calculateBearing(dest2);
-          heading_soll = -72.0;
+          heading_soll = pos.calculateBearing(dest2);
         }
       });
 
@@ -428,16 +428,6 @@ void setup()
   digitalWrite(LED_2_PIN, LOW);
   digitalWrite(LED_3_PIN, LOW);
   digitalWrite(LED_BUILTIN, LOW);
-//  pinMode(INPUT_0_PIN, INPUT_PULLUP);
-//  pinMode(INPUT_1_PIN, INPUT_PULLUP);
-//  pinMode(INPUT_2_PIN, INPUT_PULLUP);
-//  pinMode(INPUT_3_PIN, INPUT_PULLUP);
-
-  /* Setup OUT0/OUT1. */
-///  pinMode(OUTPUT_0_PIN, OUTPUT);
-//  pinMode(OUTPUT_1_PIN, OUTPUT);
-//  digitalWrite(OUTPUT_0_PIN, LOW);
-//  digitalWrite(OUTPUT_1_PIN, LOW);
 
   /* Setup SERVO0. */
   servo_0.attach(SERVO_0_PIN, 700, 2200);
@@ -519,7 +509,8 @@ void setup()
 
   DBG_INFO("Init complete.");
 
-  robot_status=1;     // start robot follow
+//  robot_status=1;     // start robot follow = roboorienteering
+  robot_status=2;     // start robot heading = robotem rovne
 //  dest.setCoordinates(dest_lat[dest_count], dest_lon[dest_count]);
 //  dest_count++;
 }
@@ -652,6 +643,8 @@ void loop()
   {
     static int display_count=0;
 
+    if(robot_status==2) heading_soll=heading_default+0.05*encoder.getCount();
+
     if(display_event>0)
     {
       if(display_event==2) servo_0.writeMicroseconds(2000);
@@ -679,7 +672,6 @@ void loop()
       if(digitalRead(ENCODER_SW)) tft.setTextColor(ST77XX_RED);
       else tft.setTextColor(ST77XX_BLUE);
       tft.print(encoder.getCount());
-      heading_soll=-72.0+0.05*encoder.getCount();
 
       tft.fillRect(0,80,128,79,ST77XX_BLACK);
       tft.setCursor(0, 142);
@@ -690,6 +682,7 @@ void loop()
       tft.setCursor(0, 132);
       tft.setTextColor(ST77XX_BLUE);
       if(robot_status==1) tft.print("FOLLOW");
+      else if(robot_status==2) tft.print("HEADING");
       else tft.print("FINISHED");
 
   //    tft.fillRect(0,90,128,77,ST77XX_BLACK);
@@ -702,7 +695,7 @@ void loop()
       tft.setCursor(0, 96);
       tft.print(heading_soll);
       tft.setCursor(0, 112);
-      tft.print(heading_distance);
+      if(robot_status==1) tft.print(heading_distance); // only relevant in follow mode
 
   //    tft.fillRect(0,150,100,8,ST77XX_BLACK);
       tft.setTextColor(ST77XX_WHITE);
