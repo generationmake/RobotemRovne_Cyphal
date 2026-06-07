@@ -598,8 +598,8 @@ void loop()
 
     if((status_em_stop==0)||(robot_status==0))
     {
-      bno_count=0;
-//      heading_soll=0;
+      bno_count=0;  // reset bno values
+      pwm=0;   // reset motor speed for soft start after emergency stop
       uavcan_motor_0_pwm.value = 0;
       uavcan_motor_1_pwm.value = 0;
       if(motor_0_pwm_pub) motor_0_pwm_pub->publish(uavcan_motor_0_pwm);
@@ -609,12 +609,10 @@ void loop()
     {
       if(bno_count<10)
       {
-//        heading_soll+=imu_orientation_x;
         bno_count++;
       }
       else if(bno_count==10)
       {
-//        heading_soll/=10;
         bno_count++;
       }
       else
