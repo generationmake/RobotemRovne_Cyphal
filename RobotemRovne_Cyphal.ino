@@ -588,7 +588,6 @@ void loop()
   /* update sensor function - every 100 ms */
   if((now - prev_sensor) > 100)
   {
-    static int bno_count=0;
     uavcan::primitive::scalar::Integer16_1_0 uavcan_motor_0_pwm;
     uavcan::primitive::scalar::Integer16_1_0 uavcan_motor_1_pwm;
 
@@ -598,7 +597,6 @@ void loop()
 
     if((status_em_stop==0)||(robot_status==0))
     {
-      bno_count=0;  // reset bno values
       pwm=0;   // reset motor speed for soft start after emergency stop
       uavcan_motor_0_pwm.value = 0;
       uavcan_motor_1_pwm.value = 0;
@@ -607,30 +605,19 @@ void loop()
     }
     else
     {
-      if(bno_count<10)
+      if(pwm<150)
       {
-        bno_count++;
-      }
-      else if(bno_count==10)
-      {
-        bno_count++;
+        pwm+=5;
+        uavcan_motor_0_pwm.value = pwm;
+        uavcan_motor_1_pwm.value = pwm;
       }
       else
       {
-        if(pwm<150)
-        {
-          pwm+=5;
-          uavcan_motor_0_pwm.value = pwm;
-          uavcan_motor_1_pwm.value = pwm;
-        }
-        else
-        {
-          uavcan_motor_0_pwm.value = 152-heading_offset*2.0;
-          uavcan_motor_1_pwm.value = 150+heading_offset*2.0;
-        }
-        if(motor_0_pwm_pub) motor_0_pwm_pub->publish(uavcan_motor_0_pwm);
-        if(motor_1_pwm_pub) motor_1_pwm_pub->publish(uavcan_motor_1_pwm);
+        uavcan_motor_0_pwm.value = 152-heading_offset*2.0;
+        uavcan_motor_1_pwm.value = 150+heading_offset*2.0;
       }
+      if(motor_0_pwm_pub) motor_0_pwm_pub->publish(uavcan_motor_0_pwm);
+      if(motor_1_pwm_pub) motor_1_pwm_pub->publish(uavcan_motor_1_pwm);
     }
 
     prev_sensor = now;
