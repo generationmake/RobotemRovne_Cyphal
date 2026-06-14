@@ -23,6 +23,7 @@
 #include <107-Arduino-MCP2515.h>
 #include <107-Arduino-littlefs.h>
 #include <107-Arduino-24LCxx.hpp>
+#include "pio_encoder.h"
 #include <NavPoint.h>
 
 #define DBG_ENABLE_ERROR
@@ -48,14 +49,15 @@ using namespace uavcan::node;
 
 static uint8_t const EEPROM_I2C_DEV_ADDR = 0x50;
 
+static int const ENCODER_SW         = 8;
 static int const SERVO_0_PIN        = 14;
 static int const MCP2515_CS_PIN     = 17;
 static int const MCP2515_INT_PIN    = 20;
 static int const LED_2_PIN          = 21; /* GP21 */
 static int const LED_3_PIN          = 22; /* GP22 */
 static int const ANALOG_PIN         = 26;
-static int const ANALOG_INPUT_0_PIN = 27;
-static int const ANALOG_INPUT_1_PIN = 28;
+static int const ENCODER_A          = 27;
+static int const ENCODER_B          = 28;
   #define TFT_CS         6
   #define TFT_RST        9 // Or set to -1 and connect to Arduino RESET pin
   #define TFT_DC         7
@@ -78,6 +80,7 @@ ExecuteCommand::Response_1_1 onExecuteCommand_1_1_Request_Received(ExecuteComman
  **************************************************************************************/
 
 Adafruit_ST7735 tft = Adafruit_ST7735(&SPI1, TFT_CS, TFT_DC, TFT_RST);
+PioEncoder encoder(ENCODER_A, false, 0, COUNT_1X, pio0);
 
 DEBUG_INSTANCE(80, Serial);
 
@@ -97,8 +100,6 @@ cyphal::Node node_hdl(node_heap.data(), node_heap.size(), micros, [] (CanardFram
 cyphal::Publisher<Heartbeat_1_0> heartbeat_pub = node_hdl.create_publisher<Heartbeat_1_0>(1*1000*1000UL /* = 1 sec in usecs. */);
 cyphal::Publisher<uavcan::primitive::scalar::Real32_1_0> input_voltage_pub;
 cyphal::Publisher<uavcan::primitive::scalar::Real32_1_0> internal_temperature_pub;
-cyphal::Publisher<uavcan::primitive::scalar::Integer16_1_0> analog_input_0_pub;
-cyphal::Publisher<uavcan::primitive::scalar::Integer16_1_0> analog_input_1_pub;
 cyphal::Publisher<uavcan::primitive::scalar::Integer16_1_0> motor_0_pwm_pub;
 cyphal::Publisher<uavcan::primitive::scalar::Integer16_1_0> motor_1_pwm_pub;
 
@@ -117,7 +118,9 @@ float imu_orientation_x = 0.0;
 uint8_t imu_calibration[] = { 0, 0, 0, 0 };
 float imu_coordinates[] = { 0.0, 0.0, 0.0 };
 float heading_soll=0;
+float heading_default = -72.0;
 float heading_distance=0;
+float speed_default = 150.0;
 int robot_status=0;
 int display_event=0;
 
@@ -136,20 +139,25 @@ struct waypoints {float lat; float lon; int ball;};
 //   { 48.631240752644366, 13.025888025861484, 0},
 //   { 48.631258479434464, 13.026427149834598, 0},
 // };
-//roboorienteering
+//deggendorf technikhaus
 struct waypoints w[]={
-  { 49.95401340932905, 12.70933844143281, 0},   // H0
-  { 49.9537240 , 12.709185, 1},   // 2
-  { 49.9539130 , 12.709649, 1},   // 3
-  { 49.953794239943875, 12.70935721689649, 0},   // H2
-  { 49.9539450 , 12.708882, 1},   // 1
-  { 49.953794239943875, 12.70935721689649, 0},   // H2
-//  { 49.9542960 , 12.708717, 1},   // 6
-  { 49.9536645 , 12.708831, 1},   // 8
-  { 49.9537122 , 12.709064, 0},   // H1
-  { 49.9534230 , 12.709187, 0},   // CIL
-  { 49.9533386405496, 12.709220424232512, 0}    // CIL - after
+  { 48.837490, 12.948067, 0},
+  { 48.837597, 12.947754, 0},
 };
+//roboorienteering marienbad 2025
+//struct waypoints w[]={
+//  { 49.95401340932905, 12.70933844143281, 0},   // H0
+//  { 49.9537240 , 12.709185, 1},   // 2
+//  { 49.9539130 , 12.709649, 1},   // 3
+//  { 49.953794239943875, 12.70935721689649, 0},   // H2
+//  { 49.9539450 , 12.708882, 1},   // 1
+//  { 49.953794239943875, 12.70935721689649, 0},   // H2
+//  { 49.9542960 , 12.708717, 1},   // 6
+//  { 49.9536645 , 12.708831, 1},   // 8
+//  { 49.9537122 , 12.709064, 0},   // H1
+//  { 49.9534230 , 12.709187, 0},   // CIL
+//  { 49.9533386405496, 12.709220424232512, 0}    // CIL - after
+//};
 int dest_count=0;
 
 /* LITTLEFS/EEPROM ********************************************************************/
@@ -205,8 +213,6 @@ static uint16_t     node_id                      = std::numeric_limits<uint16_t>
 static CanardPortID port_id_input_voltage        = std::numeric_limits<CanardPortID>::max();
 static CanardPortID port_id_led1                 = std::numeric_limits<CanardPortID>::max();
 static CanardPortID port_id_internal_temperature = std::numeric_limits<CanardPortID>::max();
-static CanardPortID port_id_analog_input0        = std::numeric_limits<CanardPortID>::max();
-static CanardPortID port_id_analog_input1        = std::numeric_limits<CanardPortID>::max();
 static CanardPortID port_id_em_stop              = std::numeric_limits<CanardPortID>::max();
 static CanardPortID port_id_motor0_pwm           = std::numeric_limits<CanardPortID>::max();
 static CanardPortID port_id_motor1_pwm           = std::numeric_limits<CanardPortID>::max();
@@ -216,10 +222,8 @@ static CanardPortID port_id_coordinates          = std::numeric_limits<CanardPor
 
 static uint16_t update_period_ms_inputvoltage        =  3*1000;
 static uint16_t update_period_ms_internaltemperature = 10*1000;
-static uint16_t update_period_ms_analoginput0        =     500;
-static uint16_t update_period_ms_analoginput1        =     500;
 
-static std::string node_description{"RobotemRovne2025"};
+static std::string node_description{"RobotemRovne2026"};
 
 #if __GNUC__ >= 11
 
@@ -231,10 +235,6 @@ const auto reg_rw_cyphal_pub_inputvoltage_id                = node_registry->exp
 const auto reg_ro_cyphal_pub_inputvoltage_type              = node_registry->route ("cyphal.pub.inputvoltage.type",             {true}, []() { return "uavcan.primitive.scalar.Real32.1.0"; });
 const auto reg_rw_cyphal_pub_internaltemperature_id         = node_registry->expose("cyphal.pub.internaltemperature.id",        {true}, port_id_internal_temperature);
 const auto reg_ro_cyphal_pub_internaltemperature_type       = node_registry->route ("cyphal.pub.internaltemperature.type",      {true}, []() { return "uavcan.primitive.scalar.Real32.1.0"; });
-const auto reg_rw_cyphal_pub_analoginput0_id                = node_registry->expose("cyphal.pub.analoginput0.id",               {true}, port_id_analog_input0);
-const auto reg_ro_cyphal_pub_analoginput0_type              = node_registry->route ("cyphal.pub.analoginput0.type",             {true}, []() { return "uavcan.primitive.scalar.Integer16.1.0"; });
-const auto reg_rw_cyphal_pub_analoginput1_id                = node_registry->expose("cyphal.pub.analoginput1.id",               {true}, port_id_analog_input1);
-const auto reg_ro_cyphal_pub_analoginput1_type              = node_registry->route ("cyphal.pub.analoginput1.type",             {true}, []() { return "uavcan.primitive.scalar.Integer16.1.0"; });
 const auto reg_rw_cyphal_sub_led1_id                        = node_registry->expose("cyphal.sub.led1.id",                       {true}, port_id_led1);
 const auto reg_ro_cyphal_sub_led1_type                      = node_registry->route ("cyphal.sub.led1.type",                     {true}, []() { return "uavcan.primitive.scalar.Bit.1.0"; });
 const auto reg_rw_cyphal_sub_em_stop_id                     = node_registry->expose("cyphal.sub.em_stop.id",                    {true}, port_id_em_stop);
@@ -251,8 +251,6 @@ const auto reg_rw_cyphal_sub_coordinates_id                 = node_registry->exp
 const auto reg_ro_cyphal_sub_coordinates_type               = node_registry->route ("cyphal.sub.coordinates.type",              {true}, []() { return "uavcan.primitive.array.Real32.1.0"; });
 const auto reg_rw_pico_update_period_ms_inputvoltage        = node_registry->expose("pico.update_period_ms.inputvoltage",        {true}, update_period_ms_inputvoltage);
 const auto reg_rw_pico_update_period_ms_internaltemperature = node_registry->expose("pico.update_period_ms.internaltemperature", {true}, update_period_ms_internaltemperature);
-const auto reg_rw_pico_update_period_ms_analoginput0        = node_registry->expose("pico.update_period_ms.analoginput0",        {true}, update_period_ms_analoginput0);
-const auto reg_rw_pico_update_period_ms_analoginput1        = node_registry->expose("pico.update_period_ms.analoginput1",        {true}, update_period_ms_analoginput1);
 
 #endif /* __GNUC__ >= 11 */
 
@@ -325,10 +323,6 @@ void setup()
   if (port_id_internal_temperature != std::numeric_limits<CanardPortID>::max())
     internal_temperature_pub = node_hdl.create_publisher<uavcan::primitive::scalar::Real32_1_0>(port_id_internal_temperature, 1*1000*1000UL /* = 1 sec in usecs. */);
 
-  if (port_id_analog_input0 != std::numeric_limits<CanardPortID>::max())
-    analog_input_0_pub = node_hdl.create_publisher<uavcan::primitive::scalar::Integer16_1_0>(port_id_analog_input0, 1*1000*1000UL /* = 1 sec in usecs. */);
-  if (port_id_analog_input1 != std::numeric_limits<CanardPortID>::max())
-    analog_input_1_pub = node_hdl.create_publisher<uavcan::primitive::scalar::Integer16_1_0>(port_id_analog_input1, 1*1000*1000UL /* = 1 sec in usecs. */);
   if (port_id_motor0_pwm != std::numeric_limits<CanardPortID>::max())
     motor_0_pwm_pub = node_hdl.create_publisher<uavcan::primitive::scalar::Integer16_1_0>(port_id_motor0_pwm, 1*1000*1000UL /* = 1 sec in usecs. */);
   if (port_id_motor1_pwm != std::numeric_limits<CanardPortID>::max())
@@ -374,8 +368,10 @@ void setup()
             DBG_WARNING("IMU coordinates message contains more than %d entries", 4);
             return;
           }
-
           imu_coordinates[sid] = msg.value[sid];
+        }
+        if(robot_status==1) // in follow mode
+        {
           NavPoint pos(imu_coordinates[0], imu_coordinates[1]);
           NavPoint dest2(w[dest_count].lat, w[dest_count].lon);
           // distance
@@ -404,8 +400,6 @@ void setup()
     /* set factory settings */
     if(update_period_ms_inputvoltage==0xFFFF)        update_period_ms_inputvoltage=3*1000;
     if(update_period_ms_internaltemperature==0xFFFF) update_period_ms_internaltemperature=10*1000;
-    if(update_period_ms_analoginput0==0xFFFF)        update_period_ms_analoginput0=500;
-    if(update_period_ms_analoginput1==0xFFFF)        update_period_ms_analoginput1=500;
 
   /* NODE INFO **************************************************************************/
   static const auto node_info = node_hdl.create_node_info
@@ -435,16 +429,6 @@ void setup()
   digitalWrite(LED_2_PIN, LOW);
   digitalWrite(LED_3_PIN, LOW);
   digitalWrite(LED_BUILTIN, LOW);
-//  pinMode(INPUT_0_PIN, INPUT_PULLUP);
-//  pinMode(INPUT_1_PIN, INPUT_PULLUP);
-//  pinMode(INPUT_2_PIN, INPUT_PULLUP);
-//  pinMode(INPUT_3_PIN, INPUT_PULLUP);
-
-  /* Setup OUT0/OUT1. */
-///  pinMode(OUTPUT_0_PIN, OUTPUT);
-//  pinMode(OUTPUT_1_PIN, OUTPUT);
-//  digitalWrite(OUTPUT_0_PIN, LOW);
-//  digitalWrite(OUTPUT_1_PIN, LOW);
 
   /* Setup SERVO0. */
   servo_0.attach(SERVO_0_PIN, 700, 2200);
@@ -508,6 +492,10 @@ void setup()
   /* Leave configuration and enable MCP2515. */
   mcp2515.setNormalMode();
 
+  /* configure encoder input */
+  pinMode(ENCODER_SW, INPUT);
+  encoder.begin();
+
   // Use this initializer if using a 1.8" TFT screen:
   tft.initR(INITR_BLACKTAB);      // Init ST7735S chip, black tab
   tft.fillScreen(ST77XX_BLACK);
@@ -522,7 +510,8 @@ void setup()
 
   DBG_INFO("Init complete.");
 
-  robot_status=1;     // start robot follow
+//  robot_status=1;     // start robot follow = roboorienteering
+  robot_status=2;     // start robot heading = robotem rovne
 //  dest.setCoordinates(dest_lat[dest_count], dest_lon[dest_count]);
 //  dest_count++;
 }
@@ -546,15 +535,11 @@ void loop()
   static unsigned long prev_heartbeat = 0;
   static unsigned long prev_battery_voltage = 0;
   static unsigned long prev_internal_temperature = 0;
-  static unsigned long prev_analog_input0 = 0;
-  static unsigned long prev_analog_input1 = 0;
   static unsigned long prev_sensor = 0;
   static unsigned long prev_display = 0;
 
 //  static float heading_soll=0;
   static float heading_offset=0;
-
-  static int pwm=0;
 
   unsigned long const now = millis();
 
@@ -599,72 +584,36 @@ void loop()
     prev_internal_temperature = now;
   }
 
-  if((now - prev_analog_input0) > update_period_ms_analoginput0)
-  {
-    uavcan::primitive::scalar::Integer16_1_0 uavcan_analog_input0;
-    uavcan_analog_input0.value = analogRead(ANALOG_INPUT_0_PIN);
-    if(analog_input_0_pub) analog_input_0_pub->publish(uavcan_analog_input0);
-
-    prev_analog_input0 = now;
-  }
-  if((now - prev_analog_input1) > update_period_ms_analoginput1)
-  {
-    uavcan::primitive::scalar::Integer16_1_0 uavcan_analog_input1;
-    uavcan_analog_input1.value = analogRead(ANALOG_INPUT_1_PIN);
-    if(analog_input_1_pub) analog_input_1_pub->publish(uavcan_analog_input1);
-
-    prev_analog_input1 = now;
-  }
-
   /* update sensor function - every 100 ms */
   if((now - prev_sensor) > 100)
   {
-    static int bno_count=0;
     uavcan::primitive::scalar::Integer16_1_0 uavcan_motor_0_pwm;
     uavcan::primitive::scalar::Integer16_1_0 uavcan_motor_1_pwm;
+    static float ramp=0.0;
+    static float heading_offset_sum=0.0;
 
     heading_offset=heading_soll-imu_orientation_x;
     if(heading_offset<-180.0) heading_offset+=360.0;
     if(heading_offset>180.0) heading_offset-=360.0;
+    heading_offset_sum=heading_offset_sum+heading_offset;
 
     if((status_em_stop==0)||(robot_status==0))
     {
-      bno_count=0;
-//      heading_soll=0;
+      ramp=0.0;   // reset motor speed for soft start after emergency stop
+      heading_offset_sum=0.0;   // reset integrator part of controller
       uavcan_motor_0_pwm.value = 0;
       uavcan_motor_1_pwm.value = 0;
-      if(motor_0_pwm_pub) motor_0_pwm_pub->publish(uavcan_motor_0_pwm);
-      if(motor_1_pwm_pub) motor_1_pwm_pub->publish(uavcan_motor_1_pwm);
     }
     else
     {
-      if(bno_count<10)
-      {
-//        heading_soll+=imu_orientation_x;
-        bno_count++;
-      }
-      else if(bno_count==10)
-      {
-//        heading_soll/=10;
-        bno_count++;
-      }
-      else
-      {
-        if(pwm<150)
-        {
-          pwm+=5;
-          uavcan_motor_0_pwm.value = pwm;
-          uavcan_motor_1_pwm.value = pwm;
-        }
-        else
-        {
-          uavcan_motor_0_pwm.value = 152-heading_offset*2.0;
-          uavcan_motor_1_pwm.value = 150+heading_offset*2.0;
-        }
-        if(motor_0_pwm_pub) motor_0_pwm_pub->publish(uavcan_motor_0_pwm);
-        if(motor_1_pwm_pub) motor_1_pwm_pub->publish(uavcan_motor_1_pwm);
-      }
+      if(ramp<1.0) ramp+=0.03;
+      else ramp=1.0;
+
+      uavcan_motor_0_pwm.value = ramp*(speed_default-heading_offset*2.0-heading_offset_sum*0.2);
+      uavcan_motor_1_pwm.value = ramp*(speed_default+heading_offset*2.0+heading_offset_sum*0.2);
     }
+    if(motor_0_pwm_pub) motor_0_pwm_pub->publish(uavcan_motor_0_pwm);
+    if(motor_1_pwm_pub) motor_1_pwm_pub->publish(uavcan_motor_1_pwm);
 
     prev_sensor = now;
   }
@@ -673,6 +622,8 @@ void loop()
   if((now - prev_display) > 200)
   {
     static int display_count=0;
+
+    if(robot_status==2) heading_soll=heading_default+0.05*encoder.getCount();
 
     if(display_event>0)
     {
@@ -696,6 +647,11 @@ void loop()
       tft.setTextSize(0);
       tft.setCursor(0, 0);
       tft.print(millis() / 1000);
+      tft.fillRect(64,0,24,8,ST77XX_BLACK);
+      tft.setCursor(64, 0);
+      if(digitalRead(ENCODER_SW)) tft.setTextColor(ST77XX_RED);
+      else tft.setTextColor(ST77XX_BLUE);
+      tft.print(encoder.getCount());
 
       tft.fillRect(0,80,128,79,ST77XX_BLACK);
       tft.setCursor(0, 142);
@@ -706,6 +662,7 @@ void loop()
       tft.setCursor(0, 132);
       tft.setTextColor(ST77XX_BLUE);
       if(robot_status==1) tft.print("FOLLOW");
+      else if(robot_status==2) tft.print("HEADING");
       else tft.print("FINISHED");
 
   //    tft.fillRect(0,90,128,77,ST77XX_BLACK);
@@ -718,7 +675,7 @@ void loop()
       tft.setCursor(0, 96);
       tft.print(heading_soll);
       tft.setCursor(0, 112);
-      tft.print(heading_distance);
+      if(robot_status==1) tft.print(heading_distance); // only relevant in follow mode
 
   //    tft.fillRect(0,150,100,8,ST77XX_BLACK);
       tft.setTextColor(ST77XX_WHITE);
