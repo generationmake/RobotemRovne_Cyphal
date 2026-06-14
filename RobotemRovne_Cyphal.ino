@@ -49,6 +49,7 @@ using namespace uavcan::node;
 
 static uint8_t const EEPROM_I2C_DEV_ADDR = 0x50;
 
+static int const SWITCH1            = 2;
 static int const ENCODER_SW         = 8;
 static int const SERVO_0_PIN        = 14;
 static int const MCP2515_CS_PIN     = 17;
@@ -61,6 +62,7 @@ static int const ENCODER_B          = 28;
   #define TFT_CS         6
   #define TFT_RST        9 // Or set to -1 and connect to Arduino RESET pin
   #define TFT_DC         7
+static int const TFT_BKLT           = 3;
 
 static SPISettings const MCP2515x_SPI_SETTING{10*1000*1000UL, MSBFIRST, SPI_MODE0};
 
@@ -426,9 +428,12 @@ void setup()
   pinMode(LED_2_PIN, OUTPUT);
   pinMode(LED_3_PIN, OUTPUT);
   pinMode(LED_BUILTIN, OUTPUT);
+  pinMode(TFT_BKLT, OUTPUT);
+  pinMode(SWITCH1, INPUT_PULLUP);
   digitalWrite(LED_2_PIN, LOW);
   digitalWrite(LED_3_PIN, LOW);
   digitalWrite(LED_BUILTIN, LOW);
+  digitalWrite(TFT_BKLT, LOW);
 
   /* Setup SERVO0. */
   servo_0.attach(SERVO_0_PIN, 700, 2200);
