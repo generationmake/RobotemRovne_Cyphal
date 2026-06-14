@@ -262,6 +262,8 @@ const auto reg_rw_pico_update_period_ms_internaltemperature = node_registry->exp
 
 void setup()
 {
+  pinMode(TFT_BKLT, OUTPUT);
+  digitalWrite(TFT_BKLT, HIGH);
   Serial.begin(115200);
   // while(!Serial) { } /* only for debug */
   delay(1000);
@@ -428,12 +430,10 @@ void setup()
   pinMode(LED_2_PIN, OUTPUT);
   pinMode(LED_3_PIN, OUTPUT);
   pinMode(LED_BUILTIN, OUTPUT);
-  pinMode(TFT_BKLT, OUTPUT);
   pinMode(SWITCH1, INPUT_PULLUP);
   digitalWrite(LED_2_PIN, LOW);
   digitalWrite(LED_3_PIN, LOW);
   digitalWrite(LED_BUILTIN, LOW);
-  digitalWrite(TFT_BKLT, LOW);
 
   /* Setup SERVO0. */
   servo_0.attach(SERVO_0_PIN, 700, 2200);
@@ -508,6 +508,7 @@ void setup()
   tft.setTextColor(ST77XX_GREEN);
   tft.setTextSize(3);
   tft.println("Robotem Rovne");
+  digitalWrite(TFT_BKLT, LOW);
 
   /* Enable watchdog. */
 //  rp2040.wdt_begin(WATCHDOG_DELAY_ms);
