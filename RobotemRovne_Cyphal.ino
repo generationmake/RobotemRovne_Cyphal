@@ -629,6 +629,12 @@ void loop()
   {
     static int display_count=0;
 
+    if(!digitalRead(SWITCH1))
+    {
+      heading_default=imu_orientation_x;
+      encoder.reset();
+    }
+
     if(robot_status==2) heading_soll=heading_default+0.05*encoder.getCount();
 
     if(display_event>0)
