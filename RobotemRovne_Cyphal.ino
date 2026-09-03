@@ -520,6 +520,18 @@ void setup()
   robot_status=2;     // start robot heading = robotem rovne
 //  dest.setCoordinates(dest_lat[dest_count], dest_lon[dest_count]);
 //  dest_count++;
+  encoder.reset(robot_status);
+}
+
+void draw_button(int x, int y, char * text, bool active)
+{
+  if(active) tft.fillRect(x+1,y+1,106,14,0x39e7);
+  else tft.fillRect(x+1,y+1,106,14,ST77XX_BLACK);
+  tft.drawRoundRect(x, y, 108, 16, 3, ST77XX_WHITE);
+  tft.setTextSize(0);
+  tft.setCursor(x+5, y+4);
+  tft.setTextColor(ST77XX_BLUE);
+  tft.print(text);
 }
 
 void loop()
@@ -543,6 +555,8 @@ void loop()
   static unsigned long prev_internal_temperature = 0;
   static unsigned long prev_sensor = 0;
   static unsigned long prev_display = 0;
+
+  static int menu=0;
 
 //  static float heading_soll=0;
   static float heading_offset=0;
@@ -629,99 +643,138 @@ void loop()
   {
     static int display_count=0;
 
-    if(!digitalRead(SWITCH1))
+    if(menu==0)
     {
-      heading_default=imu_orientation_x;
-      encoder.reset();
-    }
+      static int counter_active=1;
+      int menu_select=encoder.getCount();
+      if(menu_select!=robot_status) counter_active=0;
+      if(menu_select<1) menu_select=1;
+      if(menu_select>5) menu_select=5;
+      encoder.reset(menu_select);
 
-    if(robot_status==2) heading_soll=heading_default+0.05*encoder.getCount();
-
-    if(display_event>0)
-    {
-      if(display_event==2) servo_0.writeMicroseconds(2000);
-      if(display_count==0) display_count=10;
-      if(display_count>1) display_count--;
-      else
+      tft.fillScreen(ST77XX_BLUE);
+      if(counter_active)
       {
-        display_event=0;
-        display_count=0;
+        tft.setTextColor(ST77XX_WHITE);
+        tft.setTextSize(0);
+        tft.setCursor(0, 0);
+        tft.print(millis() / 1000);
+        if(millis()>10000)
+        {
+          menu=1;
+          encoder.reset();
+        }
       }
-      if(display_event==1) tft.fillScreen(ST77XX_GREEN);
-      else if(display_event==2) tft.fillScreen(ST77XX_BLUE);
-      else if(display_event==3) tft.fillScreen(ST77XX_RED);
+
+      if(!digitalRead(ENCODER_SW))
+      {
+        robot_status=menu_select;
+        menu=1;
+        encoder.reset();
+      }
+
+      draw_button(10,10, "Roboorienteering", menu_select==1?1:0);
+      draw_button(10,30, "Robotem Rovne", menu_select==2?1:0);
+      draw_button(10,50, "Werte anzeigen", menu_select==3?1:0);
+      draw_button(10,70, "Karte anzeigen", menu_select==4?1:0);
+      draw_button(10,90, "Einstellungen", menu_select==5?1:0);
     }
     else
     {
-      servo_0.writeMicroseconds(700);
-      tft.fillRect(0,0,24,8,ST77XX_BLACK);
-      tft.setTextColor(ST77XX_WHITE);
-      tft.setTextSize(0);
-      tft.setCursor(0, 0);
-      tft.print(millis() / 1000);
-      tft.fillRect(64,0,24,8,ST77XX_BLACK);
-      tft.setCursor(64, 0);
-      if(digitalRead(ENCODER_SW)) tft.setTextColor(ST77XX_RED);
-      else tft.setTextColor(ST77XX_BLUE);
-      tft.print(encoder.getCount());
 
-      tft.fillRect(0,80,128,79,ST77XX_BLACK);
-      tft.setCursor(0, 142);
-      if(status_em_stop==0) tft.setTextColor(ST77XX_RED);
-      else tft.setTextColor(ST77XX_GREEN);
-      tft.print("STOP");
-
-      tft.setCursor(0, 132);
-      tft.setTextColor(ST77XX_BLUE);
-      if(robot_status==1) tft.print("FOLLOW");
-      else if(robot_status==2) tft.print("HEADING");
-      else tft.print("FINISHED");
-
-  //    tft.fillRect(0,90,128,77,ST77XX_BLACK);
-      tft.setTextColor(ST77XX_WHITE);
-      tft.setTextSize(2);
-      tft.setCursor(0, 80);
-      tft.print(imu_orientation_x);
-      if(status_em_stop==1) tft.setTextColor(ST77XX_WHITE);
-      else tft.setTextColor(0x4208);
-      tft.setCursor(0, 96);
-      tft.print(heading_soll);
-      tft.setCursor(0, 112);
-      if(robot_status==1) tft.print(heading_distance); // only relevant in follow mode
-
-  //    tft.fillRect(0,150,100,8,ST77XX_BLACK);
-      tft.setTextColor(ST77XX_WHITE);
-      tft.setTextSize(0);
-      tft.setCursor(0, 152);
-      tft.print(imu_calibration[0]);
-      tft.setCursor(16, 152);
-      tft.print(imu_calibration[1]);
-      tft.setCursor(32, 152);
-      tft.print(imu_calibration[2]);
-      tft.setCursor(48, 152);
-      tft.print(imu_calibration[3]);
-
-      tft.setCursor(64, 132);
-      tft.print(imu_coordinates[0],6);
-      tft.setCursor(64, 142);
-      tft.print(imu_coordinates[1],6);
-      tft.setCursor(64, 152);
-      tft.print(imu_coordinates[2]);
-
-      /* print circle and arrow */
-  //    if(status_em_stop==1)
+      if(!digitalRead(SWITCH1))
       {
-        int circle_x=64;
-        int circle_y=40;
-        int circle_r=30;
+        heading_default=imu_orientation_x;
+        encoder.reset();
+      }
 
-        tft.fillCircle(circle_x, circle_y, circle_r, ST77XX_BLACK);
-        tft.drawCircle(circle_x, circle_y, circle_r, ST77XX_WHITE);
-        float circle_heading=heading_offset*1.0;
-        tft.fillTriangle((circle_x+circle_r*sin(circle_heading*DEG_TO_RAD)), (circle_y-circle_r*cos(circle_heading*DEG_TO_RAD)), (circle_x+circle_r*sin((circle_heading+150.0)*DEG_TO_RAD)), (circle_y-circle_r*cos((circle_heading+150.0)*DEG_TO_RAD)), (circle_x+circle_r*sin((circle_heading-150.0)*DEG_TO_RAD)), (circle_y-circle_r*cos((circle_heading-150.0)*DEG_TO_RAD)), ST77XX_BLUE);
+      if(robot_status==2) heading_soll=heading_default+0.05*encoder.getCount();
+
+      if(display_event>0)
+      {
+        if(display_event==2) servo_0.writeMicroseconds(2000);
+        if(display_count==0) display_count=10;
+        if(display_count>1) display_count--;
+        else
+        {
+          display_event=0;
+          display_count=0;
+        }
+        if(display_event==1) tft.fillScreen(ST77XX_GREEN);
+        else if(display_event==2) tft.fillScreen(ST77XX_BLUE);
+        else if(display_event==3) tft.fillScreen(ST77XX_RED);
+      }
+      else
+      {
+        servo_0.writeMicroseconds(700);
+        tft.fillRect(0,0,24,8,ST77XX_BLACK);
+        tft.setTextColor(ST77XX_WHITE);
+        tft.setTextSize(0);
+        tft.setCursor(0, 0);
+        tft.print(millis() / 1000);
+        tft.fillRect(64,0,24,8,ST77XX_BLACK);
+        tft.setCursor(64, 0);
+        if(digitalRead(ENCODER_SW)) tft.setTextColor(ST77XX_RED);
+        else tft.setTextColor(ST77XX_BLUE);
+        tft.print(encoder.getCount());
+
+        tft.fillRect(0,80,128,79,ST77XX_BLACK);
+        tft.setCursor(0, 142);
+        if(status_em_stop==0) tft.setTextColor(ST77XX_RED);
+        else tft.setTextColor(ST77XX_GREEN);
+        tft.print("STOP");
+
+        tft.setCursor(0, 132);
+        tft.setTextColor(ST77XX_BLUE);
+        if(robot_status==1) tft.print("FOLLOW");
+        else if(robot_status==2) tft.print("HEADING");
+        else tft.print("FINISHED");
+
+    //    tft.fillRect(0,90,128,77,ST77XX_BLACK);
+        tft.setTextColor(ST77XX_WHITE);
+        tft.setTextSize(2);
+        tft.setCursor(0, 80);
+        tft.print(imu_orientation_x);
+        if(status_em_stop==1) tft.setTextColor(ST77XX_WHITE);
+        else tft.setTextColor(0x4208);
+        tft.setCursor(0, 96);
+        tft.print(heading_soll);
+        tft.setCursor(0, 112);
+        if(robot_status==1) tft.print(heading_distance); // only relevant in follow mode
+
+    //    tft.fillRect(0,150,100,8,ST77XX_BLACK);
+        tft.setTextColor(ST77XX_WHITE);
+        tft.setTextSize(0);
+        tft.setCursor(0, 152);
+        tft.print(imu_calibration[0]);
+        tft.setCursor(16, 152);
+        tft.print(imu_calibration[1]);
+        tft.setCursor(32, 152);
+        tft.print(imu_calibration[2]);
+        tft.setCursor(48, 152);
+        tft.print(imu_calibration[3]);
+
+        tft.setCursor(64, 132);
+        tft.print(imu_coordinates[0],6);
+        tft.setCursor(64, 142);
+        tft.print(imu_coordinates[1],6);
+        tft.setCursor(64, 152);
+        tft.print(imu_coordinates[2]);
+
+        /* print circle and arrow */
+    //    if(status_em_stop==1)
+        {
+          int circle_x=64;
+          int circle_y=40;
+          int circle_r=30;
+
+          tft.fillCircle(circle_x, circle_y, circle_r, ST77XX_BLACK);
+          tft.drawCircle(circle_x, circle_y, circle_r, ST77XX_WHITE);
+          float circle_heading=heading_offset*1.0;
+          tft.fillTriangle((circle_x+circle_r*sin(circle_heading*DEG_TO_RAD)), (circle_y-circle_r*cos(circle_heading*DEG_TO_RAD)), (circle_x+circle_r*sin((circle_heading+150.0)*DEG_TO_RAD)), (circle_y-circle_r*cos((circle_heading+150.0)*DEG_TO_RAD)), (circle_x+circle_r*sin((circle_heading-150.0)*DEG_TO_RAD)), (circle_y-circle_r*cos((circle_heading-150.0)*DEG_TO_RAD)), ST77XX_BLUE);
+        }
       }
     }
-
     prev_display = now;
   }
 
