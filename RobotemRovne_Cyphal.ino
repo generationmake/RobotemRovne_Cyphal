@@ -49,6 +49,7 @@ using namespace uavcan::node;
 
 static uint8_t const EEPROM_I2C_DEV_ADDR = 0x50;
 
+static int const SWITCH1            = 2;
 static int const ENCODER_SW         = 8;
 static int const SERVO_0_PIN        = 14;
 static int const MCP2515_CS_PIN     = 17;
@@ -61,6 +62,7 @@ static int const ENCODER_B          = 28;
   #define TFT_CS         6
   #define TFT_RST        9 // Or set to -1 and connect to Arduino RESET pin
   #define TFT_DC         7
+static int const TFT_BKLT           = 3;
 
 static SPISettings const MCP2515x_SPI_SETTING{10*1000*1000UL, MSBFIRST, SPI_MODE0};
 
@@ -260,6 +262,8 @@ const auto reg_rw_pico_update_period_ms_internaltemperature = node_registry->exp
 
 void setup()
 {
+  pinMode(TFT_BKLT, OUTPUT);
+  digitalWrite(TFT_BKLT, HIGH);
   Serial.begin(115200);
   // while(!Serial) { } /* only for debug */
   delay(1000);
@@ -426,6 +430,7 @@ void setup()
   pinMode(LED_2_PIN, OUTPUT);
   pinMode(LED_3_PIN, OUTPUT);
   pinMode(LED_BUILTIN, OUTPUT);
+  pinMode(SWITCH1, INPUT_PULLUP);
   digitalWrite(LED_2_PIN, LOW);
   digitalWrite(LED_3_PIN, LOW);
   digitalWrite(LED_BUILTIN, LOW);
@@ -503,6 +508,7 @@ void setup()
   tft.setTextColor(ST77XX_GREEN);
   tft.setTextSize(3);
   tft.println("Robotem Rovne");
+  digitalWrite(TFT_BKLT, LOW);
 
   /* Enable watchdog. */
 //  rp2040.wdt_begin(WATCHDOG_DELAY_ms);
@@ -622,6 +628,12 @@ void loop()
   if((now - prev_display) > 200)
   {
     static int display_count=0;
+
+    if(!digitalRead(SWITCH1))
+    {
+      heading_default=imu_orientation_x;
+      encoder.reset();
+    }
 
     if(robot_status==2) heading_soll=heading_default+0.05*encoder.getCount();
 

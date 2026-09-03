@@ -33,20 +33,20 @@ Code for the Robot for the Robotem Rovne Contest based on the Cyphal protocol
 | 1       | GP0          | UART0_TX      | reserved                         |
 | 2       | GP1          | UART0_RX      | reserved                         |
 | 3       | GND          | GND           |                                  |
-| 4       | GP2          |               |                                  |
-| 5       | GP3          |               |                                  |
-| 6       | GP4          | I2C0_SDA      | for eeprom and BNO055            |
-| 7       | GP5          | I2C0_SCL      | for eeprom and BNO055            |
+| 4       | GP2          | SWITCH1       | user switch                      |
+| 5       | GP3          | TFT_BKLT      | display backlight enable         |
+| 6       | GP4          | I2C0_SDA      | for eeprom                       |
+| 7       | GP5          | I2C0_SCL      | for eeprom                       |
 | 8       | GND          | GND           |                                  |
 | 9       | GP6          | TFT_CS        | display CS                       |
 | 10      | GP7          | TFT_DC        | display DC                       |
 | 11      | GP8          | ROT_SW        | rotary encoder switch            |
 | 12      | GP9          | TFT_RST       | display RST                      |
 | 13      | GND          | GND           |                                  |
-| 14      | GP10         | SPI1_CLK      | SPI for display                  |
-| 15      | GP11         | SPI1_MOSI     | SPI for display                  |
-| 16      | GP12         | SPI1_MISO     | SPI for display                  |
-| 17      | GP13         | reserved      |                                  |
+| 14      | GP10         | SPI1_CLK      | SPI for display and SD card      |
+| 15      | GP11         | SPI1_MOSI     | SPI for display and SD card      |
+| 16      | GP12         | SPI1_MISO     | SPI for display and SD card      |
+| 17      | GP13         | reserved      | SD card CS                       |
 | 18      | GND          | GND           |                                  |
 | 19      | GP14         | SERVO0        | servo 0                          |
 | 20      | GP15         | SERVO1        | servo 1                          |
