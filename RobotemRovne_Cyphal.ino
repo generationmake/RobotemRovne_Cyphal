@@ -25,6 +25,7 @@
 #include <107-Arduino-24LCxx.hpp>
 #include "pio_encoder.h"
 #include <NavPoint.h>
+#include "bitmaps.h"
 
 #define DBG_ENABLE_ERROR
 #define DBG_ENABLE_WARNING
@@ -522,6 +523,10 @@ void setup()
 //  dest.setCoordinates(dest_lat[dest_count], dest_lon[dest_count]);
 //  dest_count++;
   encoder.reset(robot_status);
+  tft.fillScreen(ST77XX_WHITE);
+  tft.drawRGBBitmap(4, 50, epd_bitmap_genmake_logo_display, 120, 19);
+  tft.drawRGBBitmap(4, 90, epd_bitmap_opencyphal_logo_display, 120, 26);
+  delay(5000);
 }
 
 void draw_button(int x, int y, char * text, bool active)
@@ -653,14 +658,15 @@ void loop()
       if(menu_select>5) menu_select=5;
       encoder.reset(menu_select);
 
-      tftc.fillScreen(ST77XX_BLUE);
+      tftc.drawRGBBitmap(0, 0, epd_bitmap_display_background, 128, 160);
+//      tftc.fillScreen(ST77XX_BLUE);
       if(counter_active)
       {
         tftc.setTextColor(ST77XX_WHITE);
         tftc.setTextSize(0);
         tftc.setCursor(0, 0);
         tftc.print(millis() / 1000);
-        if(millis()>10000)
+        if(millis()>15000)
         {
           menu=1;
           encoder.reset();
